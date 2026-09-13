@@ -1,0 +1,22 @@
+syntax = "proto3";
+package filesystem;
+option go_package = "github.com/oikos/oikos/gen/go/filesystem";
+import "google/protobuf/empty.proto";
+
+message FileRequest { string server_id = 1; string path = 2; }
+message FileInfo { string name = 1; string path = 2; bool is_dir = 3; int64 size_bytes = 4; int64 modified_unix = 5; string mode = 6; }
+message ListResponse { repeated FileInfo files = 1; }
+message UploadChunk { string server_id = 1; string path = 2; bytes data = 3; bool last = 4; }
+message UploadResponse { int64 size_bytes = 1; }
+message DownloadRequest { string server_id = 1; string path = 2; }
+message DownloadChunk { bytes data = 1; bool last = 2; }
+message RenameRequest { string server_id = 1; string old_path = 2; string new_path = 3; }
+service FilesystemService {
+  rpc List(FileRequest) returns (ListResponse);
+  rpc Delete(FileRequest) returns (google.protobuf.Empty);
+  rpc Rename(RenameRequest) returns (google.protobuf.Empty);
+  rpc Copy(RenameRequest) returns (google.protobuf.Empty);
+  rpc CreateDir(FileRequest) returns (google.protobuf.Empty);
+  rpc Upload(stream UploadChunk) returns (UploadResponse);
+  rpc Download(DownloadRequest) returns (stream DownloadChunk);
+}

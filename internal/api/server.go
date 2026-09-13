@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	fspb "github.com/oikos/oikos/gen/go/filesystem"
 	obspb "github.com/oikos/oikos/gen/go/observability"
 	serverpb "github.com/oikos/oikos/gen/go/server"
 	"github.com/oikos/oikos/internal/orchestrator"
@@ -29,6 +30,14 @@ func NewServerWithObservability(lc *orchestrator.Lifecycle, obs *ObservabilitySe
 	srv := NewServer(lc)
 	if obs != nil {
 		obspb.RegisterObservabilityServiceServer(srv, obs)
+	}
+	return srv
+}
+
+func NewServerWithServices(lc *orchestrator.Lifecycle, obs *ObservabilityService, fs *FilesystemService) *grpc.Server {
+	srv := NewServerWithObservability(lc, obs)
+	if fs != nil {
+		fspb.RegisterFilesystemServiceServer(srv, fs)
 	}
 	return srv
 }

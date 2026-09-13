@@ -17,6 +17,7 @@ import (
 	"github.com/oikos/oikos/internal/agent"
 	"github.com/oikos/oikos/internal/api"
 	"github.com/oikos/oikos/internal/config"
+	"github.com/oikos/oikos/internal/filesystem"
 	"github.com/oikos/oikos/internal/observability"
 	"github.com/oikos/oikos/internal/orchestrator"
 	"github.com/oikos/oikos/internal/runtime"
@@ -79,6 +80,8 @@ func runDaemon(args []string) error {
 		portRoot = "eggs"
 	}
 	lc := orchestrator.NewWithTunnel(db, rt, bus, manager, orchestrator.EggPortProvider{Root: portRoot})
+	fileManager := filesystem.NewManager(cfg.Filesystem.ServerRoot)
+	fileService := api.NewFilesystemService(fileManager, cfg.Filesystem.MaxUploadBytes, int(cfg.Filesystem.UploadChunkBytes))
 	metrics := observability.NewMetrics(prometheus.NewRegistry(), observability.RuntimeSnapshotProvider{DB: db, Runtime: rt})
 	health := observability.NewHealthChecker(map[string]observability.Probe{
 		"sqlite": func(context.Context) error { return db.Ping() },
@@ -112,5 +115,6 @@ func runDaemon(args []string) error {
 		LocalPort:     cfg.API.LocalGRPCPort,
 		Tunnel:        manager,
 		Observability: api.NewObservabilityService(health, metrics, db),
+		Filesystem:    fileService,
 	}, lc)
 }

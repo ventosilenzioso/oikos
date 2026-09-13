@@ -22,6 +22,7 @@ type DaemonArgs struct {
 	LocalPort     int
 	Tunnel        tunnel.Manager
 	Observability *api.ObservabilityService
+	Filesystem    *api.FilesystemService
 }
 
 // Run menjalankan loop daemon: serve API lokal, dial Panel, heartbeat +
@@ -31,7 +32,7 @@ func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error
 	if err != nil {
 		return fmt.Errorf("listen api lokal: %w", err)
 	}
-	apiSrv := api.NewServerWithObservability(lc, args.Observability)
+	apiSrv := api.NewServerWithServices(lc, args.Observability, args.Filesystem)
 	go func() { _ = apiSrv.Serve(lis) }()
 	defer apiSrv.GracefulStop()
 	if args.Tunnel != nil {
