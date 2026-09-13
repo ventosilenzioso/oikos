@@ -21,5 +21,7 @@ func Default() *Config {
 			BindAddr: "127.0.0.1:9191", MetricsPath: "/metrics", HealthPath: "/healthz",
 			EventRetentionDays: 30, MetricsInterval: Duration(15 * time.Second), HealthInterval: Duration(15 * time.Second),
 		},
+		Filesystem: FilesystemConfig{ServerRoot: "/var/lib/oikos/servers", BackupRoot: "/var/lib/oikos/backups", UploadChunkBytes: 1048576, MaxUploadBytes: 10737418240},
+		SFTP:       SFTPConfig{Enabled: false, BindAddr: "127.0.0.1:2222", HostKeyPath: "/etc/oikos/certs/sftp_host.key"},
 	}
 }

@@ -65,6 +65,19 @@ type ObservabilityConfig struct {
 	HealthInterval     Duration `yaml:"health_interval"`
 }
 
+type FilesystemConfig struct {
+	ServerRoot       string `yaml:"server_root"`
+	BackupRoot       string `yaml:"backup_root"`
+	UploadChunkBytes int64  `yaml:"upload_chunk_bytes"`
+	MaxUploadBytes   int64  `yaml:"max_upload_bytes"`
+}
+
+type SFTPConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	BindAddr    string `yaml:"bind_addr"`
+	HostKeyPath string `yaml:"host_key_path"`
+}
+
 type Config struct {
 	Node          NodeConfig          `yaml:"node"`
 	Panel         PanelConfig         `yaml:"panel"`
@@ -72,6 +85,8 @@ type Config struct {
 	API           APIConfig           `yaml:"api"`
 	Log           LogConfig           `yaml:"log"`
 	Observability ObservabilityConfig `yaml:"observability"`
+	Filesystem    FilesystemConfig    `yaml:"filesystem"`
+	SFTP          SFTPConfig          `yaml:"sftp"`
 }
 
 func Load(path string) (*Config, error) {

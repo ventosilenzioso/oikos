@@ -46,6 +46,8 @@ var observabilityMigrationCandidates = []string{
 	"../../migrations/0003_observability.sql",
 }
 
+var filesystemMigrationCandidates = []string{"migrations/0004_filesystem_backup.sql", "../../migrations/0004_filesystem_backup.sql"}
+
 func (d *DB) Migrate() error {
 	var data []byte
 	var err error
@@ -61,7 +63,28 @@ func (d *DB) Migrate() error {
 	if _, err := d.sql.Exec(string(data)); err != nil {
 		return fmt.Errorf("aplikasi migrasi: %w", err)
 	}
-	return d.MigrateObservability()
+	if err := d.MigrateObservability(); err != nil {
+		return err
+	}
+	return d.MigrateFilesystem()
+}
+
+func (d *DB) MigrateFilesystem() error {
+	var data []byte
+	var err error
+	for _, p := range filesystemMigrationCandidates {
+		data, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("baca migrasi filesystem: %w", err)
+	}
+	if _, err := d.sql.Exec(string(data)); err != nil {
+		return fmt.Errorf("aplikasi migrasi filesystem: %w", err)
+	}
+	return nil
 }
 
 func (d *DB) MigrateNetworking() error {
@@ -435,6 +458,75 @@ func (d *DB) ListTunnelsForMetrics() ([]MetricTunnel, error) {
 func (d *DB) PruneEvents(ctx context.Context, before time.Time) error {
 	_, err := d.sql.ExecContext(ctx, `DELETE FROM events WHERE created_at < ?`, before.UTC().Format(time.RFC3339))
 	return err
+}
+
+func (d *DB) SaveBackup(b Backup) error {
+	_, err := d.sql.Exec(`INSERT INTO backups(id,server_id,file_path,size_bytes,checksum_sha256,status,created_at,completed_at) VALUES(?,?,?,?,?,?,?,NULLIF(?,''))`, b.ID, b.ServerID, b.FilePath, b.SizeBytes, b.ChecksumSHA, b.Status, b.CreatedAt.UTC().Format(time.RFC3339), formatTime(b.CompletedAt))
+	return err
+}
+
+func (d *DB) GetBackup(id string) (Backup, error) {
+	var b Backup
+	var created, completed sql.NullString
+	err := d.sql.QueryRow(`SELECT id,server_id,file_path,size_bytes,checksum_sha256,status,created_at,completed_at FROM backups WHERE id=?`, id).Scan(&b.ID, &b.ServerID, &b.FilePath, &b.SizeBytes, &b.ChecksumSHA, &b.Status, &created, &completed)
+	if err != nil {
+		return Backup{}, err
+	}
+	b.CreatedAt, err = time.Parse(time.RFC3339, created.String)
+	if err != nil {
+		return Backup{}, err
+	}
+	if completed.Valid {
+		b.CompletedAt, err = time.Parse(time.RFC3339, completed.String)
+	}
+	return b, err
+}
+
+func (d *DB) ListBackups(serverID string) ([]Backup, error) {
+	rows, err := d.sql.Query(`SELECT id,server_id,file_path,size_bytes,checksum_sha256,status,created_at,completed_at FROM backups WHERE server_id=? ORDER BY created_at DESC`, serverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Backup
+	for rows.Next() {
+		var b Backup
+		var created, completed sql.NullString
+		if err := rows.Scan(&b.ID, &b.ServerID, &b.FilePath, &b.SizeBytes, &b.ChecksumSHA, &b.Status, &created, &completed); err != nil {
+			return nil, err
+		}
+		b.CreatedAt, err = time.Parse(time.RFC3339, created.String)
+		if err != nil {
+			return nil, err
+		}
+		if completed.Valid {
+			b.CompletedAt, err = time.Parse(time.RFC3339, completed.String)
+			if err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) UpdateBackupStatus(id, status, checksum string, size int64) error {
+	_, err := d.sql.Exec(`UPDATE backups SET status=?, checksum_sha256=?, size_bytes=?, completed_at=CASE WHEN ?='completed' THEN CURRENT_TIMESTAMP ELSE completed_at END WHERE id=?`, status, checksum, size, status, id)
+	return err
+}
+func (d *DB) DeleteBackup(id string) error {
+	_, err := d.sql.Exec(`DELETE FROM backups WHERE id=?`, id)
+	return err
+}
+
+func (d *DB) SaveSFTPCredential(c SFTPCredential) error {
+	_, err := d.sql.Exec(`INSERT INTO sftp_credentials(id,server_id,username,public_key,password_hash) VALUES(?,?,?,?,?)`, c.ID, c.ServerID, c.Username, c.PublicKey, c.PasswordHash)
+	return err
+}
+func (d *DB) GetSFTPCredential(username string) (SFTPCredential, error) {
+	var c SFTPCredential
+	err := d.sql.QueryRow(`SELECT id,server_id,username,public_key,password_hash FROM sftp_credentials WHERE username=?`, username).Scan(&c.ID, &c.ServerID, &c.Username, &c.PublicKey, &c.PasswordHash)
+	return c, err
 }
 
 func (d *DB) DeleteTunnelByMapping(serverID string, localPort int, protocol string) error {

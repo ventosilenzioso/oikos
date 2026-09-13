@@ -26,3 +26,12 @@ observability:
   event_retention_days: 30
   metrics_interval: "15s"
   health_interval: "15s"
+filesystem:
+  server_root: "/var/lib/oikos/servers"
+  backup_root: "/var/lib/oikos/backups"
+  upload_chunk_bytes: 1048576
+  max_upload_bytes: 10737418240
+sftp:
+  enabled: false
+  bind_addr: "127.0.0.1:2222"
+  host_key_path: "/etc/oikos/certs/sftp_host.key"

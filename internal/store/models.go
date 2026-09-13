@@ -59,3 +59,22 @@ type NetworkGroupMember struct {
 	NodeID    string
 	PrivateIP string
 }
+
+type Backup struct {
+	ID          string
+	ServerID    string
+	FilePath    string
+	SizeBytes   int64
+	ChecksumSHA string
+	Status      string
+	CreatedAt   time.Time
+	CompletedAt time.Time
+}
+
+type SFTPCredential struct {
+	ID           string
+	ServerID     string
+	Username     string
+	PublicKey    string
+	PasswordHash string
+}
