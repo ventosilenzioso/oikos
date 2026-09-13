@@ -351,6 +351,9 @@ func TestRollbackProjectionFailureRestoresPriorManifest(t *testing.T) {
 	if state.Current != "v2" || state.Previous != "v1" {
 		t.Fatalf("state after rollback failure = %+v, want v2/v1", state)
 	}
+	if got := linkTarget(t, filepath.Join(root, "current")); got != "v2" {
+		t.Fatalf("current after rollback recovery = %q, want v2", got)
+	}
 }
 
 func TestRollbackRecoveryFailureIncludesDiagnosticsAndPriorState(t *testing.T) {

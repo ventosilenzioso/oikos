@@ -237,8 +237,8 @@ func TestRegistryConcreteHostRegistersNegotiatedRouteHandlerAndRestarts(t *testi
 }
 
 func TestRegistryStartAllRollsBackEarlierHostAndRoutes(t *testing.T) {
-	good := &routeRegistryHost{registryHost: &registryHost{manifest: Manifest{ID: "good", AllowedRoutes: []string{"/plugins/good/status"}}}, route: http.NotFoundHandler()}
-	bad := &failingStartHost{registryHost: &registryHost{manifest: Manifest{ID: "bad", AllowedRoutes: []string{"/plugins/bad/status"}}}}
+	good := &routeRegistryHost{registryHost: &registryHost{manifest: Manifest{ID: "a-good", AllowedRoutes: []string{"/plugins/a-good/status"}}}, route: http.NotFoundHandler()}
+	bad := &failingStartHost{registryHost: &registryHost{manifest: Manifest{ID: "z-bad", AllowedRoutes: []string{"/plugins/z-bad/status"}}}}
 	r := newTestRegistry(orchestrator.NewEventBus(), good.registryHost, bad.registryHost)
 	r.hosts["good"], r.hosts["bad"] = good, bad
 	if err := r.StartAll(); err == nil {
@@ -248,7 +248,7 @@ func TestRegistryStartAllRollsBackEarlierHostAndRoutes(t *testing.T) {
 		t.Fatal("started host was not rolled back")
 	}
 	response := httptest.NewRecorder()
-	r.Proxy().Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/plugins/good/status", nil))
+	r.Proxy().Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/plugins/a-good/status", nil))
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("rolled-back route status = %d", response.Code)
 	}

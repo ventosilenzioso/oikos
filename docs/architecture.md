@@ -1,29 +1,15 @@
-# Architecture
+# Architecture Notes
 
-## Platform Support
+Linux adalah target production utama. Cgroups, Unix process groups, Unix socket,
+dan filesystem permission diisolasi melalui interface atau build tags.
 
-Linux is Oikos's production target. The Linux build provides cgroup v2
-resource enforcement, Unix-domain plugin sockets, and Unix process groups.
+Cross-platform compile checks dijalankan tanpa mengeksekusi binary foreign OS:
 
-The public platform boundaries live in `internal/platform` and
-`internal/resource`. They keep operating-system imports behind build tags.
-Darwin and Windows builds are compile/API checks, not claims of full production
-support. Features that require Linux cgroups, Unix sockets, or Unix process
-groups return an explicit `ErrNotSupported` rather than silently degrading.
-
-Cross-platform validation uses compile-only commands because a binary built for
-another OS cannot execute on the host:
-
-```sh
+```bash
 GOOS=linux go test ./...
-for os in darwin windows; do
-  mkdir -p "/tmp/oikos-cross/$os"
-  GOOS="$os" go list ./... | while read -r pkg; do
-    name=$(printf '%s' "$pkg" | tr '/.' '__')
-    GOOS="$os" go test -c -o "/tmp/oikos-cross/$os/$name.test" "$pkg"
-  done
-done
+GOOS=darwin go test -c ./internal/platform
+GOOS=windows go test -c ./internal/platform
 ```
 
-The Linux command runs tests on the host. The Darwin and Windows commands only
-compile test binaries; those binaries cannot execute on a Linux host.
+Darwin dan Windows compile support bukan klaim node production penuh; fitur
+Linux-only mengembalikan `ErrNotSupported` di platform tersebut.

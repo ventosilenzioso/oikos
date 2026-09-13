@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -136,7 +137,13 @@ func (r *Registry) StartAll() error {
 	}
 	r.mu.Unlock()
 	started := make([]string, 0, len(hosts))
-	for id, host := range hosts {
+	ids := make([]string, 0, len(hosts))
+	for id := range hosts {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		host := hosts[id]
 		if err := host.Start(); err != nil {
 			r.rollbackStarted(started)
 			r.mu.Lock()
