@@ -89,6 +89,12 @@ func (m *manager) Apply(release Release) error {
 	if err := os.Rename(tmpPath, candidate); err != nil {
 		return err
 	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.RemoveAll(candidate)
+		}
+	}()
 	if m.health != nil {
 		if err := m.health.Run(candidate); err != nil {
 			return fmt.Errorf("candidate health check: %w", err)
@@ -98,6 +104,9 @@ func (m *manager) Apply(release Release) error {
 	if err := m.config.saveState(newState); err != nil {
 		return err
 	}
+	// Setelah state manifest tersimpan, candidate menjadi slot historis yang
+	// sengaja dipertahankan untuk diagnosis dan rollback.
+	committed = true
 	if err := m.config.projectState(newState); err != nil {
 		return m.config.restoreState(state, fmt.Errorf("project slot state: %w", err))
 	}
