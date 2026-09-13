@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/oikos/oikos/internal/platform"
 )
 
 type ProcessController interface {
@@ -34,7 +35,9 @@ func (p *osProcessController) Start(ctx context.Context, configPath string) erro
 		return nil
 	}
 	cmd := exec.CommandContext(ctx, p.binary, "-c", configPath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := platform.NewProcessGroup().Configure(cmd); err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start frpc: %w", err)
 	}
@@ -54,7 +57,7 @@ func (p *osProcessController) Stop(ctx context.Context) error {
 	if cmd == nil || cmd.Process == nil {
 		return nil
 	}
-	_ = cmd.Process.Signal(syscall.SIGTERM)
+	_ = platform.NewProcessGroup().Terminate(cmd)
 	timer := time.NewTimer(5 * time.Second)
 	defer timer.Stop()
 	select {

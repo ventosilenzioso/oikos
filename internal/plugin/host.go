@@ -15,6 +15,7 @@ import (
 	"time"
 
 	pluginpb "github.com/oikos/oikos/gen/go/plugin"
+	"github.com/oikos/oikos/internal/platform"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -80,7 +81,7 @@ func (h *Host) Start() error {
 	}
 	h.socketPath = filepath.Join(h.options.SocketRoot, h.manifest.ID+".sock")
 	_ = os.Remove(h.socketPath)
-	listener, err := net.Listen("unix", h.socketPath)
+	listener, err := platform.SocketPath(h.socketPath)
 	if err != nil {
 		h.mu.Unlock()
 		return fmt.Errorf("create plugin socket: %w", err)
