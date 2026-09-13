@@ -19,8 +19,15 @@ type PanelConfig struct {
 }
 
 type RuntimeConfig struct {
-	Engine       string `yaml:"engine"`
-	DockerSocket string `yaml:"docker_socket"`
+	Engine           string `yaml:"engine"`
+	DockerSocket     string `yaml:"docker_socket"`
+	FRPBinary        string `yaml:"frp_binary"`
+	FRPConfig        string `yaml:"frp_config"`
+	FRPServerAddr    string `yaml:"frp_server_addr"`
+	FRPServerPort    int    `yaml:"frp_server_port"`
+	FRPToken         string `yaml:"frp_token"`
+	FRPRemotePortMin int    `yaml:"frp_remote_port_min"`
+	FRPRemotePortMax int    `yaml:"frp_remote_port_max"`
 }
 
 type APIConfig struct {

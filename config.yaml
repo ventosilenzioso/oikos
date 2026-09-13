@@ -8,6 +8,13 @@ panel:
 runtime:
   engine: "docker"
   docker_socket: "unix:///var/run/docker.sock"
+  frp_binary: "/usr/local/bin/frpc"
+  frp_config: "/var/lib/oikos/frpc.toml"
+  frp_server_addr: "frps.example.com"
+  frp_server_port: 7000
+  frp_token: ""
+  frp_remote_port_min: 30000
+  frp_remote_port_max: 40000
 api:
   local_grpc_port: 9190
 log:
