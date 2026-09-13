@@ -1,11 +1,15 @@
 package security
 
 import (
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestCSRSignatureValid(t *testing.T) {
@@ -80,8 +84,20 @@ func TestLoadClientTLSRoundtrip(t *testing.T) {
 	if err := SaveKey(keyPath, priv); err != nil {
 		t.Fatal(err)
 	}
+	// Self-signed cert yang cocok dengan key (cukup untuk uji load keypair).
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "node-uji"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, priv.Public(), priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodePEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 	certPath := filepath.Join(dir, "node.crt")
-	if err := SaveCert(certPath, caPEM); err != nil {
+	if err := SaveCert(certPath, nodePEM); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadClientTLS(certPath, keyPath, caPath)
