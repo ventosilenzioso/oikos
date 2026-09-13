@@ -97,6 +97,13 @@ func runDoctor(args []string) error {
 			}
 			return doctorWarn, "v2 unavailable; resource limits may be degraded"
 		}},
+		{Name: "lsm", Required: false, Run: func() (doctorResult, string) {
+			s := security.DetectLSM()
+			if s.AppArmorAvailable || s.SELinuxAvailable {
+				return doctorOK, fmt.Sprintf("apparmor=%t selinux=%t mode=%s", s.AppArmorAvailable, s.SELinuxAvailable, s.SELinuxMode)
+			}
+			return doctorWarn, "AppArmor/SELinux tidak tersedia; fallback aktif"
+		}},
 		{Name: "panel.mtls", Required: false, Run: func() (doctorResult, string) {
 			if db == nil {
 				return doctorWarn, "skipped: SQLite unavailable"
