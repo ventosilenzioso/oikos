@@ -132,6 +132,16 @@ func (l *Lifecycle) RestartServer(ctx context.Context, id string) error {
 	return nil
 }
 
+// GetServer membaca satu server dari store.
+func (l *Lifecycle) GetServer(id string) (store.Server, error) {
+	return getServer(l.db, id)
+}
+
+// ListServers membaca semua server dari store.
+func (l *Lifecycle) ListServers() ([]store.Server, error) {
+	return l.db.ListServers()
+}
+
 func (l *Lifecycle) DeleteServer(ctx context.Context, id string) error {
 	s, err := getServer(l.db, id)
 	if err != nil {
