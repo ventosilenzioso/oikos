@@ -15,6 +15,7 @@ type NodeConfig struct {
 
 type PanelConfig struct {
 	Address string `yaml:"address"`
+	CAPath  string `yaml:"ca_path"`
 }
 
 type RuntimeConfig struct {

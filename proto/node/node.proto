@@ -14,13 +14,35 @@ message HeartbeatRequest {
   int64 uptime_seconds = 2;
 }
 
+message HeartbeatAck {
+  bool ok = 1;
+  string message = 2;
+}
+
 message PairingRequest {
   string token = 1;
   string node_name = 2;
+  bytes csr_pem = 3;
 }
 
 message PairingResponse {
   string node_id = 1;
-  string cert_pem = 2;
-  string key_pem = 3;
+  bytes cert_pem = 2;
+}
+
+message StreamRequest {
+  string node_id = 1;
+}
+
+message NodeCommand {
+  string command_id = 1;
+  string action = 2;
+  string server_id = 3;
+  map<string, string> args = 4;
+}
+
+service NodeService {
+  rpc Pair(PairingRequest) returns (PairingResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatAck);
+  rpc StreamCommands(StreamRequest) returns (stream NodeCommand);
 }

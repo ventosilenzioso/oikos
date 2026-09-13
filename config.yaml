@@ -4,6 +4,7 @@ node:
   key_path: "/etc/oikos/certs/node.key"
 panel:
   address: "panel.example.com:9091"
+  ca_path: "/etc/oikos/certs/ca.crt"
 runtime:
   engine: "docker"
   docker_socket: "unix:///var/run/docker.sock"

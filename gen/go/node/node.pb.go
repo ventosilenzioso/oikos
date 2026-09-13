@@ -125,17 +125,70 @@ func (x *HeartbeatRequest) GetUptimeSeconds() int64 {
 	return 0
 }
 
+type HeartbeatAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatAck) Reset() {
+	*x = HeartbeatAck{}
+	mi := &file_node_node_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatAck) ProtoMessage() {}
+
+func (x *HeartbeatAck) ProtoReflect() protoreflect.Message {
+	mi := &file_node_node_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatAck.ProtoReflect.Descriptor instead.
+func (*HeartbeatAck) Descriptor() ([]byte, []int) {
+	return file_node_node_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *HeartbeatAck) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *HeartbeatAck) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type PairingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 	NodeName      string                 `protobuf:"bytes,2,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	CsrPem        []byte                 `protobuf:"bytes,3,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PairingRequest) Reset() {
 	*x = PairingRequest{}
-	mi := &file_node_node_proto_msgTypes[2]
+	mi := &file_node_node_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -147,7 +200,7 @@ func (x *PairingRequest) String() string {
 func (*PairingRequest) ProtoMessage() {}
 
 func (x *PairingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_node_node_proto_msgTypes[2]
+	mi := &file_node_node_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -160,7 +213,7 @@ func (x *PairingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PairingRequest.ProtoReflect.Descriptor instead.
 func (*PairingRequest) Descriptor() ([]byte, []int) {
-	return file_node_node_proto_rawDescGZIP(), []int{2}
+	return file_node_node_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PairingRequest) GetToken() string {
@@ -177,18 +230,24 @@ func (x *PairingRequest) GetNodeName() string {
 	return ""
 }
 
+func (x *PairingRequest) GetCsrPem() []byte {
+	if x != nil {
+		return x.CsrPem
+	}
+	return nil
+}
+
 type PairingResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	CertPem       string                 `protobuf:"bytes,2,opt,name=cert_pem,json=certPem,proto3" json:"cert_pem,omitempty"`
-	KeyPem        string                 `protobuf:"bytes,3,opt,name=key_pem,json=keyPem,proto3" json:"key_pem,omitempty"`
+	CertPem       []byte                 `protobuf:"bytes,2,opt,name=cert_pem,json=certPem,proto3" json:"cert_pem,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PairingResponse) Reset() {
 	*x = PairingResponse{}
-	mi := &file_node_node_proto_msgTypes[3]
+	mi := &file_node_node_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -200,7 +259,7 @@ func (x *PairingResponse) String() string {
 func (*PairingResponse) ProtoMessage() {}
 
 func (x *PairingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_node_node_proto_msgTypes[3]
+	mi := &file_node_node_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -213,7 +272,7 @@ func (x *PairingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PairingResponse.ProtoReflect.Descriptor instead.
 func (*PairingResponse) Descriptor() ([]byte, []int) {
-	return file_node_node_proto_rawDescGZIP(), []int{3}
+	return file_node_node_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PairingResponse) GetNodeId() string {
@@ -223,18 +282,123 @@ func (x *PairingResponse) GetNodeId() string {
 	return ""
 }
 
-func (x *PairingResponse) GetCertPem() string {
+func (x *PairingResponse) GetCertPem() []byte {
 	if x != nil {
 		return x.CertPem
+	}
+	return nil
+}
+
+type StreamRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamRequest) Reset() {
+	*x = StreamRequest{}
+	mi := &file_node_node_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamRequest) ProtoMessage() {}
+
+func (x *StreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_node_node_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamRequest.ProtoReflect.Descriptor instead.
+func (*StreamRequest) Descriptor() ([]byte, []int) {
+	return file_node_node_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StreamRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
 	}
 	return ""
 }
 
-func (x *PairingResponse) GetKeyPem() string {
+type NodeCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	ServerId      string                 `protobuf:"bytes,3,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,4,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeCommand) Reset() {
+	*x = NodeCommand{}
+	mi := &file_node_node_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeCommand) ProtoMessage() {}
+
+func (x *NodeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_node_node_proto_msgTypes[6]
 	if x != nil {
-		return x.KeyPem
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeCommand.ProtoReflect.Descriptor instead.
+func (*NodeCommand) Descriptor() ([]byte, []int) {
+	return file_node_node_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *NodeCommand) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
 	}
 	return ""
+}
+
+func (x *NodeCommand) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *NodeCommand) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *NodeCommand) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
 }
 
 var File_node_node_proto protoreflect.FileDescriptor
@@ -247,14 +411,32 @@ const file_node_node_proto_rawDesc = "" +
 	"\aversion\x18\x02 \x01(\tR\aversion\"R\n" +
 	"\x10HeartbeatRequest\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12%\n" +
-	"\x0euptime_seconds\x18\x02 \x01(\x03R\ruptimeSeconds\"C\n" +
+	"\x0euptime_seconds\x18\x02 \x01(\x03R\ruptimeSeconds\"8\n" +
+	"\fHeartbeatAck\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\\\n" +
 	"\x0ePairingRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1b\n" +
-	"\tnode_name\x18\x02 \x01(\tR\bnodeName\"^\n" +
+	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x12\x17\n" +
+	"\acsr_pem\x18\x03 \x01(\fR\x06csrPem\"E\n" +
 	"\x0fPairingResponse\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x19\n" +
-	"\bcert_pem\x18\x02 \x01(\tR\acertPem\x12\x17\n" +
-	"\akey_pem\x18\x03 \x01(\tR\x06keyPemB$Z\"github.com/oikos/oikos/gen/go/nodeb\x06proto3"
+	"\bcert_pem\x18\x02 \x01(\fR\acertPem\"(\n" +
+	"\rStreamRequest\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\"\xcb\x01\n" +
+	"\vNodeCommand\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12\x1b\n" +
+	"\tserver_id\x18\x03 \x01(\tR\bserverId\x12/\n" +
+	"\x04args\x18\x04 \x03(\v2\x1b.node.NodeCommand.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xb7\x01\n" +
+	"\vNodeService\x123\n" +
+	"\x04Pair\x12\x14.node.PairingRequest\x1a\x15.node.PairingResponse\x127\n" +
+	"\tHeartbeat\x12\x16.node.HeartbeatRequest\x1a\x12.node.HeartbeatAck\x12:\n" +
+	"\x0eStreamCommands\x12\x13.node.StreamRequest\x1a\x11.node.NodeCommand0\x01B$Z\"github.com/oikos/oikos/gen/go/nodeb\x06proto3"
 
 var (
 	file_node_node_proto_rawDescOnce sync.Once
@@ -268,19 +450,30 @@ func file_node_node_proto_rawDescGZIP() []byte {
 	return file_node_node_proto_rawDescData
 }
 
-var file_node_node_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_node_node_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_node_node_proto_goTypes = []any{
 	(*RegisterNodeRequest)(nil), // 0: node.RegisterNodeRequest
 	(*HeartbeatRequest)(nil),    // 1: node.HeartbeatRequest
-	(*PairingRequest)(nil),      // 2: node.PairingRequest
-	(*PairingResponse)(nil),     // 3: node.PairingResponse
+	(*HeartbeatAck)(nil),        // 2: node.HeartbeatAck
+	(*PairingRequest)(nil),      // 3: node.PairingRequest
+	(*PairingResponse)(nil),     // 4: node.PairingResponse
+	(*StreamRequest)(nil),       // 5: node.StreamRequest
+	(*NodeCommand)(nil),         // 6: node.NodeCommand
+	nil,                         // 7: node.NodeCommand.ArgsEntry
 }
 var file_node_node_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	7, // 0: node.NodeCommand.args:type_name -> node.NodeCommand.ArgsEntry
+	3, // 1: node.NodeService.Pair:input_type -> node.PairingRequest
+	1, // 2: node.NodeService.Heartbeat:input_type -> node.HeartbeatRequest
+	5, // 3: node.NodeService.StreamCommands:input_type -> node.StreamRequest
+	4, // 4: node.NodeService.Pair:output_type -> node.PairingResponse
+	2, // 5: node.NodeService.Heartbeat:output_type -> node.HeartbeatAck
+	6, // 6: node.NodeService.StreamCommands:output_type -> node.NodeCommand
+	4, // [4:7] is the sub-list for method output_type
+	1, // [1:4] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_node_node_proto_init() }
@@ -294,9 +487,9 @@ func file_node_node_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_node_node_proto_rawDesc), len(file_node_node_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_node_node_proto_goTypes,
 		DependencyIndexes: file_node_node_proto_depIdxs,

@@ -6,6 +6,13 @@ import (
 	"testing"
 )
 
+func TestDefaultCAPath(t *testing.T) {
+	c := Default()
+	if c.Panel.CAPath == "" {
+		t.Fatal("default ca_path kosong")
+	}
+}
+
 func TestDefault(t *testing.T) {
 	c := Default()
 	if c.Panel.Address == "" {
