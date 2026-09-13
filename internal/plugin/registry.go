@@ -77,7 +77,8 @@ func (r *Registry) LoadEnabled() error {
 		return err
 	}
 	loaded := make(map[string]struct{}, len(plugins))
-	r.mu.Lock()
+	loadedHosts := make(map[string]hostLifecycle)
+	loadedManifests := make(map[string]Manifest)
 	for _, p := range plugins {
 		if !p.Enabled {
 			continue
@@ -96,7 +97,11 @@ func (r *Registry) LoadEnabled() error {
 		if err != nil {
 			return err
 		}
-		r.hosts[p.ID], r.manifests[p.ID], r.enabled[p.ID] = concreteHostAdapter{host}, manifest, true
+		loadedHosts[p.ID], loadedManifests[p.ID] = concreteHostAdapter{host}, manifest
+	}
+	r.mu.Lock()
+	for id, host := range loadedHosts {
+		r.hosts[id], r.manifests[id], r.enabled[id] = host, loadedManifests[id], true
 	}
 	stale := make(map[string]hostLifecycle)
 	for id := range r.hosts {
@@ -185,12 +190,12 @@ func (r *Registry) StopAll() error {
 	}
 	r.bridgeWG.Wait()
 	r.dispatchWG.Wait()
+	var firstErr error
 	for _, host := range hosts {
 		if err := host.Stop(); err != nil {
-			r.mu.Lock()
-			r.started = false
-			r.mu.Unlock()
-			return err
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 	for id := range hosts {
@@ -199,7 +204,7 @@ func (r *Registry) StopAll() error {
 	r.mu.Lock()
 	r.started = false
 	r.mu.Unlock()
-	return nil
+	return firstErr
 }
 
 func (r *Registry) bridge() {

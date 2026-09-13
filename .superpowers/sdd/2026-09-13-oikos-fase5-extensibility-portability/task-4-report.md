@@ -98,3 +98,26 @@ Implemented plugin registry lifecycle, EventBus bridging with cancellation, even
 ### Fix commit
 
 - Pending commit for this latest reviewer-fix set.
+
+## Latest Reviewer Fix Report
+
+### Findings addressed
+
+1. `LoadEnabled` now parses and constructs all enabled hosts before acquiring the registry mutex. Malformed persisted JSON and `NewHost` validation failures therefore return without leaving registry state locked. A regression test confirms a subsequent registry lock operation completes.
+2. `StopAll` now attempts every host stop, unregisters every proxy namespace regardless of stop failures, resets lifecycle state, and returns the first host-stop error after cleanup. A regression test verifies both routes are removed when one host fails to stop.
+3. Added a direct production-path test using `concreteHostAdapter` and a real `Host` capability/handler configuration, proving the negotiated route handler forwards through `Proxy`.
+
+### Verification
+
+- `go test ./internal/plugin/ ./internal/orchestrator/ ./internal/api/ -v`
+  - PASS.
+- `go test -race ./internal/plugin/ ./internal/orchestrator/ ./internal/api/`
+  - PASS.
+- `go test ./...`
+  - PASS.
+- `gofmt` and `git diff --check`
+  - PASS.
+
+### Fix commit
+
+- Pending commit for this latest reviewer-fix set.
