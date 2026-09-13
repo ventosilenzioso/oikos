@@ -16,8 +16,13 @@ another OS cannot execute on the host:
 
 ```sh
 GOOS=linux go test ./...
-GOOS=darwin go test -c ./...
-GOOS=windows go test -c ./...
+for os in darwin windows; do
+  mkdir -p "/tmp/oikos-cross/$os"
+  GOOS="$os" go list ./... | while read -r pkg; do
+    name=$(printf '%s' "$pkg" | tr '/.' '__')
+    GOOS="$os" go test -c -o "/tmp/oikos-cross/$os/$name.test" "$pkg"
+  done
+done
 ```
 
 The Linux command runs tests on the host. The Darwin and Windows commands only
