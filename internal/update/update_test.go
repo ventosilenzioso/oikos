@@ -105,6 +105,9 @@ func TestApplyHealthFailureBeforeSwitchPreservesKnownGood(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(root, "previous")); !os.IsNotExist(err) {
 		t.Fatalf("previous exists after pre-switch failure: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(root, "v2")); !os.IsNotExist(err) {
+		t.Fatalf("failed candidate slot remains: %v", err)
+	}
 }
 
 func TestApplyHealthFailureAfterSwitchRestoresKnownGood(t *testing.T) {
