@@ -31,6 +31,17 @@ func (p *Proxy) Register(pluginID, route string, handler http.Handler) error {
 	return nil
 }
 
+func (p *Proxy) Unregister(pluginID string) {
+	prefix := "/plugins/" + pluginID + "/"
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for route := range p.routes {
+		if strings.HasPrefix(route, prefix) {
+			delete(p.routes, route)
+		}
+	}
+}
+
 func (p *Proxy) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p.mu.RLock()

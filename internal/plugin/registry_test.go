@@ -136,6 +136,32 @@ func TestRegistryLoadEnabledPersistsManifestAndRegistersNegotiatedRoutes(t *test
 	}
 }
 
+func TestRegistryLoadEnabledRemovesAndStopsStalePlugins(t *testing.T) {
+	bus := orchestrator.NewEventBus()
+	host := &registryHost{manifest: Manifest{ID: "stale"}}
+	r := newTestRegistry(bus, host)
+	p := r.Proxy()
+	if err := p.Register("stale", "/plugins/stale/status", http.NotFoundHandler()); err != nil {
+		t.Fatal(err)
+	}
+	db := openPluginDB(t)
+	r.db = db
+	if err := r.LoadEnabled(); err != nil {
+		t.Fatal(err)
+	}
+	if !host.stopped {
+		t.Fatal("stale host was not stopped")
+	}
+	if _, ok := r.hosts["stale"]; ok {
+		t.Fatal("stale host remained in registry")
+	}
+	response := httptest.NewRecorder()
+	p.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/plugins/stale/status", nil))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("stale route status = %d", response.Code)
+	}
+}
+
 func TestRegistryStartAllRegistersNegotiatedRoutes(t *testing.T) {
 	host := &routeRegistryHost{registryHost: &registryHost{manifest: Manifest{ID: "p", AllowedRoutes: []string{"/plugins/p/status"}}}, route: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })}
 	r := newTestRegistry(orchestrator.NewEventBus(), host.registryHost)
@@ -152,6 +178,65 @@ func TestRegistryStartAllRegistersNegotiatedRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRegistryConcreteHostRegistersNegotiatedRouteHandlerAndRestarts(t *testing.T) {
+	host := &Host{manifest: Manifest{ID: "p", AllowedRoutes: []string{"/plugins/p/status"}}, capability: Capability{Routes: []string{"/plugins/p/status"}}, options: HostOptions{RouteHandlers: map[string]http.Handler{"/plugins/p/status": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })}}}
+	r := NewRegistry(nil, orchestrator.NewEventBus(), HostOptions{})
+	r.hosts["p"] = &testConcreteHost{Host: host}
+	r.manifests["p"] = host.manifest
+	if err := r.StartAll(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.StopAll(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.StartAll(); err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	response := httptest.NewRecorder()
+	r.Proxy().Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/plugins/p/status", nil))
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("route status = %d", response.Code)
+	}
+	if err := r.StopAll(); err != nil {
+		t.Fatal(err)
+	}
+	response = httptest.NewRecorder()
+	r.Proxy().Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/plugins/p/status", nil))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("stopped route status = %d", response.Code)
+	}
+}
+
+type testConcreteHost struct{ *Host }
+
+func (*testConcreteHost) Start() error { return nil }
+func (*testConcreteHost) Stop() error  { return nil }
+func (h *testConcreteHost) HandleEvent(ctx context.Context, event Event) error {
+	return h.HandleEventContext(ctx, event)
+}
+
+func TestRegistryStartAllRollsBackEarlierHostAndRoutes(t *testing.T) {
+	good := &routeRegistryHost{registryHost: &registryHost{manifest: Manifest{ID: "good", AllowedRoutes: []string{"/plugins/good/status"}}}, route: http.NotFoundHandler()}
+	bad := &failingStartHost{registryHost: &registryHost{manifest: Manifest{ID: "bad", AllowedRoutes: []string{"/plugins/bad/status"}}}}
+	r := newTestRegistry(orchestrator.NewEventBus(), good.registryHost, bad.registryHost)
+	r.hosts["good"], r.hosts["bad"] = good, bad
+	if err := r.StartAll(); err == nil {
+		t.Fatal("StartAll unexpectedly succeeded")
+	}
+	if good.stopped == false {
+		t.Fatal("started host was not rolled back")
+	}
+	response := httptest.NewRecorder()
+	r.Proxy().Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/plugins/good/status", nil))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("rolled-back route status = %d", response.Code)
+	}
+}
+
+type failingStartHost struct{ *registryHost }
+
+func (*failingStartHost) Start() error { return errors.New("start failed") }
 
 func TestRegistryDispatchTimeoutUsesHostContext(t *testing.T) {
 	host := &registryHost{manifest: Manifest{ID: "p"}, status: HostStatus{Healthy: true, Running: true}}

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -233,6 +234,20 @@ func TestHostSocketIsSecureBeforeChildRuns(t *testing.T) {
 	defer host.Stop()
 	if mode := socketMode(t, host.socketPath); mode != 0o600 {
 		t.Fatalf("socket mode = %o, want 600", mode)
+	}
+}
+
+func TestHostRouteHandlerExposesOnlyNegotiatedConfiguredRoutes(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	host := &Host{manifest: Manifest{ID: "p", AllowedRoutes: []string{"/plugins/p/status"}}, capability: Capability{Routes: []string{"/plugins/p/status"}}, options: HostOptions{RouteHandlers: map[string]http.Handler{"/plugins/p/status": handler}}}
+	if got := host.Routes(); len(got) != 1 || got[0] != "/plugins/p/status" {
+		t.Fatalf("routes = %#v", got)
+	}
+	if host.RouteHandler("/plugins/p/status") == nil {
+		t.Fatal("negotiated route has no handler")
+	}
+	if host.RouteHandler("/plugins/p/admin") != nil {
+		t.Fatal("unnegotiated route returned a handler")
 	}
 }
 

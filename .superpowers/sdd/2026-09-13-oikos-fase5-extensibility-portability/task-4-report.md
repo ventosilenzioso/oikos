@@ -72,3 +72,29 @@ Implemented plugin registry lifecycle, EventBus bridging with cancellation, even
 ### Fix commit
 
 - Pending commit for this reviewer-fix set.
+
+## Latest Reviewer Fix Report
+
+### Findings addressed
+
+1. `HostOptions.RouteHandlers` now supplies the host-side HTTP handler map. `Host.RouteHandler` returns a handler only when the route was negotiated by the plugin, and the concrete registry adapter exposes it to `StartAll`; the integration test exercises the concrete host adapter path.
+2. `StopAll` unregisters every plugin namespace from the proxy, allowing a clean `StopAll` followed by `StartAll` without duplicate-route failures.
+3. `StartAll` tracks started hosts and rolls them back, including route removal, if a later host start or route registration fails.
+4. `LoadEnabled` computes the enabled DB set, stops and removes stale hosts, manifests, enabled flags, failure counters, and proxy routes for disabled or removed plugins.
+5. Added coverage for concrete host route forwarding, route absence before negotiation, restart route cleanup, and all production route-adapter paths.
+6. Synchronized `selfheal_test.go` fixture state with mutex-protected lifecycle/store fields and accessor methods. Combined race testing now passes without changing self-healer behavior.
+
+### Verification
+
+- `go test ./internal/plugin/ ./internal/orchestrator/ ./internal/api/ -v`
+  - PASS.
+- `go test -race ./internal/plugin/ ./internal/orchestrator/ ./internal/api/`
+  - PASS.
+- `go test ./...`
+  - PASS.
+- `gofmt` and `git diff --check`
+  - PASS.
+
+### Fix commit
+
+- Pending commit for this latest reviewer-fix set.

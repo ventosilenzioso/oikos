@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,7 @@ type HostOptions struct {
 	OikosVersion  string
 	EventTimeout  time.Duration
 	HealthTimeout time.Duration
+	RouteHandlers map[string]http.Handler
 }
 
 type HostStatus struct {
@@ -241,6 +243,15 @@ func (h *Host) Routes() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return append([]string(nil), h.capability.Routes...)
+}
+
+func (h *Host) RouteHandler(route string) http.Handler {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if !contains(h.capability.Routes, route) {
+		return nil
+	}
+	return h.options.RouteHandlers[route]
 }
 
 func (h *Host) Status() HostStatus {

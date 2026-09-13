@@ -31,10 +31,12 @@ func (h concreteHostAdapter) Stop() error  { return h.host.Stop() }
 func (h concreteHostAdapter) HandleEvent(ctx context.Context, event Event) error {
 	return h.host.HandleEventContext(ctx, event)
 }
-func (h concreteHostAdapter) HealthCheck() error               { return h.host.HealthCheck() }
-func (h concreteHostAdapter) Routes() []string                 { return h.host.Routes() }
-func (h concreteHostAdapter) Status() HostStatus               { return h.host.Status() }
-func (h concreteHostAdapter) RouteHandler(string) http.Handler { return http.NotFoundHandler() }
+func (h concreteHostAdapter) HealthCheck() error { return h.host.HealthCheck() }
+func (h concreteHostAdapter) Routes() []string   { return h.host.Routes() }
+func (h concreteHostAdapter) Status() HostStatus { return h.host.Status() }
+func (h concreteHostAdapter) RouteHandler(route string) http.Handler {
+	return h.host.RouteHandler(route)
+}
 
 type routeProvider interface{ RouteHandler(string) http.Handler }
 
@@ -74,12 +76,13 @@ func (r *Registry) LoadEnabled() error {
 	if err != nil {
 		return err
 	}
+	loaded := make(map[string]struct{}, len(plugins))
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	for _, p := range plugins {
 		if !p.Enabled {
 			continue
 		}
+		loaded[p.ID] = struct{}{}
 		var events []string
 		if err := json.Unmarshal([]byte(p.SubscribedEvents), &events); err != nil {
 			return fmt.Errorf("plugin %q subscribed events: %w", p.ID, err)
@@ -94,6 +97,21 @@ func (r *Registry) LoadEnabled() error {
 			return err
 		}
 		r.hosts[p.ID], r.manifests[p.ID], r.enabled[p.ID] = concreteHostAdapter{host}, manifest, true
+	}
+	stale := make(map[string]hostLifecycle)
+	for id := range r.hosts {
+		if _, ok := loaded[id]; !ok {
+			stale[id] = r.hosts[id]
+			delete(r.hosts, id)
+			delete(r.manifests, id)
+			delete(r.enabled, id)
+			delete(r.failures, id)
+		}
+	}
+	r.mu.Unlock()
+	for id, host := range stale {
+		_ = host.Stop()
+		r.proxy.Unregister(id)
 	}
 	return nil
 }
@@ -112,16 +130,21 @@ func (r *Registry) StartAll() error {
 		}
 	}
 	r.mu.Unlock()
+	started := make([]string, 0, len(hosts))
 	for id, host := range hosts {
 		if err := host.Start(); err != nil {
+			r.rollbackStarted(started)
 			r.mu.Lock()
 			r.started = false
 			r.mu.Unlock()
 			return fmt.Errorf("start plugin %q: %w", id, err)
 		}
+		started = append(started, id)
 		if provider, ok := host.(routeProvider); ok {
 			for _, route := range r.manifests[id].AllowedRoutes {
-				if err := r.proxy.Register(id, route, provider.RouteHandler(route)); err != nil {
+				handler := provider.RouteHandler(route)
+				if err := r.proxy.Register(id, route, handler); err != nil {
+					r.rollbackStarted(append(started, id))
 					r.mu.Lock()
 					r.started = false
 					r.mu.Unlock()
@@ -134,6 +157,15 @@ func (r *Registry) StartAll() error {
 	return nil
 }
 
+func (r *Registry) rollbackStarted(ids []string) {
+	for _, id := range ids {
+		if host, ok := r.hosts[id]; ok {
+			_ = host.Stop()
+		}
+		r.proxy.Unregister(id)
+	}
+}
+
 func hasEnabledFlag(enabled map[string]bool, id string) bool {
 	_, ok := enabled[id]
 	return ok
@@ -143,9 +175,9 @@ func (r *Registry) StopAll() error {
 	r.mu.Lock()
 	cancels := r.cancels
 	r.cancels = nil
-	hosts := make([]hostLifecycle, 0, len(r.hosts))
-	for _, host := range r.hosts {
-		hosts = append(hosts, host)
+	hosts := make(map[string]hostLifecycle, len(r.hosts))
+	for id, host := range r.hosts {
+		hosts[id] = host
 	}
 	r.mu.Unlock()
 	for _, cancel := range cancels {
@@ -160,6 +192,9 @@ func (r *Registry) StopAll() error {
 			r.mu.Unlock()
 			return err
 		}
+	}
+	for id := range hosts {
+		r.proxy.Unregister(id)
 	}
 	r.mu.Lock()
 	r.started = false
