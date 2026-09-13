@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -73,6 +74,22 @@ func (d *dockerRuntime) Create(ctx context.Context, spec runtime.ContainerSpec) 
 			NanoCPUs:  spec.CPULimit * 1_000_000, // milicores -> NanoCPUs
 			PidsLimit: &spec.PIDLimit,
 		},
+	}
+	if spec.SeccompProfile != "" {
+		profile, err := os.ReadFile(spec.SeccompProfile)
+		if err != nil {
+			return "", fmt.Errorf("read seccomp profile: %w", err)
+		}
+		hostCfg.SecurityOpt = append(hostCfg.SecurityOpt, "seccomp="+string(profile))
+	}
+	if spec.AppArmorProfile != "" {
+		hostCfg.SecurityOpt = append(hostCfg.SecurityOpt, "apparmor="+spec.AppArmorProfile)
+	}
+	if spec.SELinuxLabel != "" {
+		hostCfg.SecurityOpt = append(hostCfg.SecurityOpt, "label="+spec.SELinuxLabel)
+	}
+	if spec.UserNamespace {
+		hostCfg.UsernsMode = "private"
 	}
 	if spec.MountSource != "" {
 		hostCfg.Binds = []string{spec.MountSource + ":/data"}

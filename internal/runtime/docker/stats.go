@@ -38,6 +38,14 @@ type dockerStats struct {
 	} `json:"networks"`
 }
 
+func safeInt64(value uint64) int64 {
+	const maxInt64 = uint64(^uint64(0) >> 1)
+	if value > maxInt64 {
+		return int64(maxInt64)
+	}
+	return int64(value)
+}
+
 func (d *dockerRuntime) Stats(ctx context.Context, containerID string) (runtime.Stats, error) {
 	resp, err := d.cli.ContainerStats(ctx, containerID, false)
 	if err != nil {
@@ -65,10 +73,10 @@ func (d *dockerRuntime) Stats(ctx context.Context, containerID string) (runtime.
 	}
 	return runtime.Stats{
 		CPUPercent:    cpu,
-		MemoryUsedMB:  int64(s.MemoryStats.Usage / 1024 / 1024),
-		MemoryLimitMB: int64(s.MemoryStats.Limit / 1024 / 1024),
-		NetRxBytes:    int64(rx),
-		NetTxBytes:    int64(tx),
+		MemoryUsedMB:  safeInt64(s.MemoryStats.Usage / 1024 / 1024),
+		MemoryLimitMB: safeInt64(s.MemoryStats.Limit / 1024 / 1024),
+		NetRxBytes:    safeInt64(rx),
+		NetTxBytes:    safeInt64(tx),
 	}, nil
 }
 
