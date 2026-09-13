@@ -56,6 +56,8 @@ func (d *Duration) UnmarshalYAML(unmarshal func(any) error) error {
 
 func (d Duration) Duration() time.Duration { return time.Duration(d) }
 
+func (d Duration) MarshalYAML() (any, error) { return time.Duration(d).String(), nil }
+
 type ObservabilityConfig struct {
 	BindAddr           string   `yaml:"bind_addr"`
 	MetricsPath        string   `yaml:"metrics_path"`
