@@ -1,0 +1,147 @@
+package tunnel
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"github.com/oikos/oikos/internal/store"
+)
+
+type TunnelStore interface {
+	SaveTunnel(store.Tunnel) error
+	GetTunnelByMapping(string, int, string) (store.Tunnel, error)
+	ListTunnels(string) ([]store.Tunnel, error)
+	DeleteTunnelByMapping(string, int, string) error
+	UpdateTunnelStatus(string, string) error
+}
+
+type tunnelEvent struct{ Type, ServerID, TunnelID string }
+type eventPublisher interface{ Publish(any) }
+
+type FrpManager struct {
+	mu        sync.Mutex
+	cfg       FRPConfig
+	allocator PanelAllocator
+	store     TunnelStore
+	process   ProcessController
+	bus       *eventBusAdapter
+	closed    chan struct{}
+	mappings  map[string]PortMapping
+}
+
+// eventBusAdapter menghindari import cycle dan meneruskan event ke bus Fase 1.
+type eventBusAdapter struct{ publish func(string, string) }
+
+func NewFrpManager(cfg FRPConfig, allocator PanelAllocator, st TunnelStore, process ProcessController, publish func(string, string)) *FrpManager {
+	m := &FrpManager{cfg: cfg, allocator: allocator, store: st, process: process, closed: make(chan struct{}), mappings: map[string]PortMapping{}}
+	if publish != nil {
+		m.bus = &eventBusAdapter{publish: publish}
+	}
+	return m
+}
+
+func (m *FrpManager) ConfigPath() string { return m.cfg.ConfigPath }
+
+func (m *FrpManager) RegisterPort(ctx context.Context, mapping PortMapping) (Assignment, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if old, err := m.store.GetTunnelByMapping(mapping.ServerID, mapping.LocalPort, mapping.Protocol); err == nil && old.RemotePort > 0 {
+		return Assignment{TunnelID: old.ID, RemotePort: old.RemotePort, Status: TunnelStatus(old.Status)}, nil
+	}
+	a, err := m.allocator.Register(ctx, mapping)
+	if err != nil {
+		return Assignment{}, err
+	}
+	t := store.Tunnel{ID: a.TunnelID, ServerID: mapping.ServerID, LocalPort: mapping.LocalPort, RemotePort: a.RemotePort, Protocol: mapping.Protocol, Status: string(a.Status)}
+	if err := m.store.SaveTunnel(t); err != nil {
+		return Assignment{}, fmt.Errorf("simpan tunnel: %w", err)
+	}
+	mapping.TunnelID = a.TunnelID
+	mapping.RemotePort = a.RemotePort
+	m.mappings[a.TunnelID] = mapping
+	if err := m.rebuildLocked(ctx); err != nil {
+		_ = m.store.UpdateTunnelStatus(t.ID, string(TunnelError))
+		m.emit("tunnel.disconnected", t.ServerID)
+		return Assignment{}, err
+	}
+	m.emit("tunnel.connected", t.ServerID)
+	return a, nil
+}
+
+func (m *FrpManager) ReleasePort(ctx context.Context, serverID string, localPort int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tunnels, err := m.store.ListTunnels(serverID)
+	if err != nil {
+		return err
+	}
+	for _, t := range tunnels {
+		if t.LocalPort != localPort {
+			continue
+		}
+		if err := m.allocator.Release(ctx, PortMapping{TunnelID: t.ID, ServerID: t.ServerID, LocalPort: t.LocalPort, RemotePort: t.RemotePort, Protocol: t.Protocol}); err != nil {
+			return err
+		}
+		if err := m.store.DeleteTunnelByMapping(serverID, localPort, t.Protocol); err != nil {
+			return err
+		}
+		delete(m.mappings, t.ID)
+		m.emit("tunnel.disconnected", serverID)
+	}
+	return m.rebuildLocked(ctx)
+}
+
+func (m *FrpManager) Status(ctx context.Context, serverID string) ([]TunnelStatus, error) {
+	tunnels, err := m.store.ListTunnels(serverID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TunnelStatus, 0, len(tunnels))
+	for _, t := range tunnels {
+		out = append(out, TunnelStatus(t.Status))
+	}
+	return out, nil
+}
+
+func (m *FrpManager) Reload(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.rebuildLocked(ctx)
+}
+
+func (m *FrpManager) rebuildLocked(ctx context.Context) error {
+	mappings := make([]PortMapping, 0, len(m.mappings))
+	for _, mapping := range m.mappings {
+		mappings = append(mappings, mapping)
+	}
+	data, err := GenerateConfig(m.cfg, mappings)
+	if err != nil {
+		return err
+	}
+	if err := WriteConfigAtomic(m.cfg.ConfigPath, data); err != nil {
+		return err
+	}
+	if len(mappings) == 0 {
+		return m.process.Stop(ctx)
+	}
+	if len(mappings) == 1 {
+		return m.process.Start(ctx, m.cfg.ConfigPath)
+	}
+	return m.process.Reload(ctx, m.cfg.ConfigPath)
+}
+
+func (m *FrpManager) emit(typ, serverID string) {
+	if m.bus != nil {
+		m.bus.publish(typ, serverID)
+	}
+}
+
+func (m *FrpManager) Close(ctx context.Context) error {
+	select {
+	case <-m.closed:
+	default:
+		close(m.closed)
+	}
+	return m.process.Stop(ctx)
+}
