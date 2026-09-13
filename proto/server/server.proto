@@ -24,3 +24,41 @@ message DeleteServerRequest {
   string server_id = 1;
   bool force = 2;
 }
+
+message ServerOpResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message CreateServerResponse {
+  string server_id = 1;
+}
+
+message ServerInfo {
+  string id = 1;
+  string name = 2;
+  string egg_id = 3;
+  string container_id = 4;
+  string status = 5;
+  string startup_command = 6;
+}
+
+message GetServerRequest {
+  string server_id = 1;
+}
+
+message ListServersRequest {
+}
+
+message ListServersResponse {
+  repeated ServerInfo servers = 1;
+}
+
+service ServerService {
+  rpc Create(CreateServerRequest) returns (CreateServerResponse);
+  rpc Start(StartServerRequest) returns (ServerOpResponse);
+  rpc Stop(StopServerRequest) returns (ServerOpResponse);
+  rpc Delete(DeleteServerRequest) returns (ServerOpResponse);
+  rpc Get(GetServerRequest) returns (ServerInfo);
+  rpc List(ListServersRequest) returns (ListServersResponse);
+}

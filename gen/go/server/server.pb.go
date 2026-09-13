@@ -237,6 +237,310 @@ func (x *DeleteServerRequest) GetForce() bool {
 	return false
 }
 
+type ServerOpResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ServerOpResponse) Reset() {
+	*x = ServerOpResponse{}
+	mi := &file_server_server_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServerOpResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServerOpResponse) ProtoMessage() {}
+
+func (x *ServerOpResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_server_server_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServerOpResponse.ProtoReflect.Descriptor instead.
+func (*ServerOpResponse) Descriptor() ([]byte, []int) {
+	return file_server_server_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ServerOpResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *ServerOpResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type CreateServerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ServerId      string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateServerResponse) Reset() {
+	*x = CreateServerResponse{}
+	mi := &file_server_server_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateServerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateServerResponse) ProtoMessage() {}
+
+func (x *CreateServerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_server_server_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateServerResponse.ProtoReflect.Descriptor instead.
+func (*CreateServerResponse) Descriptor() ([]byte, []int) {
+	return file_server_server_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateServerResponse) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+type ServerInfo struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	EggId          string                 `protobuf:"bytes,3,opt,name=egg_id,json=eggId,proto3" json:"egg_id,omitempty"`
+	ContainerId    string                 `protobuf:"bytes,4,opt,name=container_id,json=containerId,proto3" json:"container_id,omitempty"`
+	Status         string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	StartupCommand string                 `protobuf:"bytes,6,opt,name=startup_command,json=startupCommand,proto3" json:"startup_command,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ServerInfo) Reset() {
+	*x = ServerInfo{}
+	mi := &file_server_server_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServerInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServerInfo) ProtoMessage() {}
+
+func (x *ServerInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_server_server_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServerInfo.ProtoReflect.Descriptor instead.
+func (*ServerInfo) Descriptor() ([]byte, []int) {
+	return file_server_server_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ServerInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ServerInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ServerInfo) GetEggId() string {
+	if x != nil {
+		return x.EggId
+	}
+	return ""
+}
+
+func (x *ServerInfo) GetContainerId() string {
+	if x != nil {
+		return x.ContainerId
+	}
+	return ""
+}
+
+func (x *ServerInfo) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ServerInfo) GetStartupCommand() string {
+	if x != nil {
+		return x.StartupCommand
+	}
+	return ""
+}
+
+type GetServerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ServerId      string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetServerRequest) Reset() {
+	*x = GetServerRequest{}
+	mi := &file_server_server_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetServerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetServerRequest) ProtoMessage() {}
+
+func (x *GetServerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_server_server_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetServerRequest.ProtoReflect.Descriptor instead.
+func (*GetServerRequest) Descriptor() ([]byte, []int) {
+	return file_server_server_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetServerRequest) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+type ListServersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListServersRequest) Reset() {
+	*x = ListServersRequest{}
+	mi := &file_server_server_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListServersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListServersRequest) ProtoMessage() {}
+
+func (x *ListServersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_server_server_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListServersRequest.ProtoReflect.Descriptor instead.
+func (*ListServersRequest) Descriptor() ([]byte, []int) {
+	return file_server_server_proto_rawDescGZIP(), []int{8}
+}
+
+type ListServersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Servers       []*ServerInfo          `protobuf:"bytes,1,rep,name=servers,proto3" json:"servers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListServersResponse) Reset() {
+	*x = ListServersResponse{}
+	mi := &file_server_server_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListServersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListServersResponse) ProtoMessage() {}
+
+func (x *ListServersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_server_server_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListServersResponse.ProtoReflect.Descriptor instead.
+func (*ListServersResponse) Descriptor() ([]byte, []int) {
+	return file_server_server_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListServersResponse) GetServers() []*ServerInfo {
+	if x != nil {
+		return x.Servers
+	}
+	return nil
+}
+
 var File_server_server_proto protoreflect.FileDescriptor
 
 const file_server_server_proto_rawDesc = "" +
@@ -258,7 +562,32 @@ const file_server_server_proto_rawDesc = "" +
 	"timeoutSec\"H\n" +
 	"\x13DeleteServerRequest\x12\x1b\n" +
 	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x14\n" +
-	"\x05force\x18\x02 \x01(\bR\x05forceB&Z$github.com/oikos/oikos/gen/go/serverb\x06proto3"
+	"\x05force\x18\x02 \x01(\bR\x05force\"<\n" +
+	"\x10ServerOpResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"3\n" +
+	"\x14CreateServerResponse\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\"\xab\x01\n" +
+	"\n" +
+	"ServerInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x15\n" +
+	"\x06egg_id\x18\x03 \x01(\tR\x05eggId\x12!\n" +
+	"\fcontainer_id\x18\x04 \x01(\tR\vcontainerId\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12'\n" +
+	"\x0fstartup_command\x18\x06 \x01(\tR\x0estartupCommand\"/\n" +
+	"\x10GetServerRequest\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\"\x14\n" +
+	"\x12ListServersRequest\"C\n" +
+	"\x13ListServersResponse\x12,\n" +
+	"\aservers\x18\x01 \x03(\v2\x12.server.ServerInfoR\aservers2\x87\x03\n" +
+	"\rServerService\x12C\n" +
+	"\x06Create\x12\x1b.server.CreateServerRequest\x1a\x1c.server.CreateServerResponse\x12=\n" +
+	"\x05Start\x12\x1a.server.StartServerRequest\x1a\x18.server.ServerOpResponse\x12;\n" +
+	"\x04Stop\x12\x19.server.StopServerRequest\x1a\x18.server.ServerOpResponse\x12?\n" +
+	"\x06Delete\x12\x1b.server.DeleteServerRequest\x1a\x18.server.ServerOpResponse\x123\n" +
+	"\x03Get\x12\x18.server.GetServerRequest\x1a\x12.server.ServerInfo\x12?\n" +
+	"\x04List\x12\x1a.server.ListServersRequest\x1a\x1b.server.ListServersResponseB&Z$github.com/oikos/oikos/gen/go/serverb\x06proto3"
 
 var (
 	file_server_server_proto_rawDescOnce sync.Once
@@ -272,21 +601,40 @@ func file_server_server_proto_rawDescGZIP() []byte {
 	return file_server_server_proto_rawDescData
 }
 
-var file_server_server_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_server_server_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_server_server_proto_goTypes = []any{
-	(*CreateServerRequest)(nil), // 0: server.CreateServerRequest
-	(*StartServerRequest)(nil),  // 1: server.StartServerRequest
-	(*StopServerRequest)(nil),   // 2: server.StopServerRequest
-	(*DeleteServerRequest)(nil), // 3: server.DeleteServerRequest
-	nil,                         // 4: server.CreateServerRequest.EnvironmentEntry
+	(*CreateServerRequest)(nil),  // 0: server.CreateServerRequest
+	(*StartServerRequest)(nil),   // 1: server.StartServerRequest
+	(*StopServerRequest)(nil),    // 2: server.StopServerRequest
+	(*DeleteServerRequest)(nil),  // 3: server.DeleteServerRequest
+	(*ServerOpResponse)(nil),     // 4: server.ServerOpResponse
+	(*CreateServerResponse)(nil), // 5: server.CreateServerResponse
+	(*ServerInfo)(nil),           // 6: server.ServerInfo
+	(*GetServerRequest)(nil),     // 7: server.GetServerRequest
+	(*ListServersRequest)(nil),   // 8: server.ListServersRequest
+	(*ListServersResponse)(nil),  // 9: server.ListServersResponse
+	nil,                          // 10: server.CreateServerRequest.EnvironmentEntry
 }
 var file_server_server_proto_depIdxs = []int32{
-	4, // 0: server.CreateServerRequest.environment:type_name -> server.CreateServerRequest.EnvironmentEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	10, // 0: server.CreateServerRequest.environment:type_name -> server.CreateServerRequest.EnvironmentEntry
+	6,  // 1: server.ListServersResponse.servers:type_name -> server.ServerInfo
+	0,  // 2: server.ServerService.Create:input_type -> server.CreateServerRequest
+	1,  // 3: server.ServerService.Start:input_type -> server.StartServerRequest
+	2,  // 4: server.ServerService.Stop:input_type -> server.StopServerRequest
+	3,  // 5: server.ServerService.Delete:input_type -> server.DeleteServerRequest
+	7,  // 6: server.ServerService.Get:input_type -> server.GetServerRequest
+	8,  // 7: server.ServerService.List:input_type -> server.ListServersRequest
+	5,  // 8: server.ServerService.Create:output_type -> server.CreateServerResponse
+	4,  // 9: server.ServerService.Start:output_type -> server.ServerOpResponse
+	4,  // 10: server.ServerService.Stop:output_type -> server.ServerOpResponse
+	4,  // 11: server.ServerService.Delete:output_type -> server.ServerOpResponse
+	6,  // 12: server.ServerService.Get:output_type -> server.ServerInfo
+	9,  // 13: server.ServerService.List:output_type -> server.ListServersResponse
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_server_server_proto_init() }
@@ -300,9 +648,9 @@ func file_server_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_server_server_proto_rawDesc), len(file_server_server_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   11,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_server_server_proto_goTypes,
 		DependencyIndexes: file_server_server_proto_depIdxs,
