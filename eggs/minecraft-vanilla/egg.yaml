@@ -1,0 +1,27 @@
+name: "Minecraft Vanilla"
+slug: "minecraft-vanilla"
+description: "Server Minecraft vanilla resmi dari Mojang"
+
+build:
+  dockerfile: "./Dockerfile"
+
+startup:
+  command: "java -Xms{{MIN_MEMORY}}M -Xmx{{MAX_MEMORY}}M -jar server.jar nogui"
+  stop_signal: "SIGTERM"
+  stop_command: "stop"
+  readiness_log: "Done ("
+
+variables:
+  - name: "Minimum Memory"
+    env: "MIN_MEMORY"
+    default: "1024"
+    editable: true
+  - name: "Maximum Memory"
+    env: "MAX_MEMORY"
+    default: "2048"
+    editable: true
+
+ports:
+  - name: "game"
+    default: 25565
+    protocol: "tcp"

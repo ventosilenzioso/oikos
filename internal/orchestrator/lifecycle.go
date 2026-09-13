@@ -29,6 +29,9 @@ func (l *Lifecycle) CreateServer(ctx context.Context, name, eggID, startup strin
 		return "", fmt.Errorf("encode env: %w", err)
 	}
 	id := uuid.NewString()
+	if err := l.db.EnsureEgg(store.Egg{ID: eggID, Name: eggID}); err != nil {
+		return "", fmt.Errorf("registrasi egg: %w", err)
+	}
 	if err := l.db.CreateServer(store.Server{
 		ID: id, Name: name, EggID: eggID,
 		Status: "installing", StartupCommand: startup, Environment: string(envJSON),

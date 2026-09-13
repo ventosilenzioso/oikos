@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package server;
+
+option go_package = "github.com/oikos/oikos/gen/go/server";
+
+message CreateServerRequest {
+  string name = 1;
+  string egg_id = 2;
+  string startup_command = 3;
+  map<string, string> environment = 4;
+}
+
+message StartServerRequest {
+  string server_id = 1;
+}
+
+message StopServerRequest {
+  string server_id = 1;
+  int32 timeout_sec = 2;
+}
+
+message DeleteServerRequest {
+  string server_id = 1;
+  bool force = 2;
+}

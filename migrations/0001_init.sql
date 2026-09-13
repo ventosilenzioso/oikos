@@ -1,6 +1,6 @@
 -- 0001_init.sql
 
-CREATE TABLE nodes (
+CREATE TABLE IF NOT EXISTS nodes (
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL,
     panel_url       TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE nodes (
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE eggs (
+CREATE TABLE IF NOT EXISTS eggs (
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL,
     dockerfile_path TEXT NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE eggs (
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE servers (
+CREATE TABLE IF NOT EXISTS servers (
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL,
     egg_id          TEXT NOT NULL REFERENCES eggs(id),
@@ -30,7 +30,7 @@ CREATE TABLE servers (
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE resource_limits (
+CREATE TABLE IF NOT EXISTS resource_limits (
     server_id       TEXT PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
     cpu_limit       INTEGER,
     memory_limit_mb INTEGER,
@@ -39,4 +39,4 @@ CREATE TABLE resource_limits (
     bandwidth_kbps  INTEGER
 );
 
-CREATE INDEX idx_servers_status ON servers(status);
+CREATE INDEX IF NOT EXISTS idx_servers_status ON servers(status);

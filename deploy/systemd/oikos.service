@@ -1,0 +1,14 @@
+[Unit]
+Description=Oikos game server daemon
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/oikos daemon --config /etc/oikos/config.yaml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

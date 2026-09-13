@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package node;
+
+option go_package = "github.com/oikos/oikos/gen/go/node";
+
+message RegisterNodeRequest {
+  string name = 1;
+  string version = 2;
+}
+
+message HeartbeatRequest {
+  string node_id = 1;
+  int64 uptime_seconds = 2;
+}
+
+message PairingRequest {
+  string token = 1;
+  string node_name = 2;
+}
+
+message PairingResponse {
+  string node_id = 1;
+  string cert_pem = 2;
+  string key_pem = 3;
+}

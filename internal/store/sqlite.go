@@ -55,6 +55,13 @@ func (d *DB) CreateEgg(e Egg) error {
 	return err
 }
 
+// EnsureEgg mendaftarkan egg bila belum ada (no-op bila sudah terdaftar).
+func (d *DB) EnsureEgg(e Egg) error {
+	_, err := d.sql.Exec(`INSERT OR IGNORE INTO eggs(id,name,dockerfile_path,metadata_path) VALUES(?,?,?,?)`,
+		e.ID, e.Name, e.DockerfilePath, e.MetadataPath)
+	return err
+}
+
 func (d *DB) CreateServer(s Server) error {
 	_, err := d.sql.Exec(`INSERT INTO servers(id,name,egg_id,container_id,status,startup_command,environment) VALUES(?,?,?,?,?,?,?)`,
 		s.ID, s.Name, s.EggID, nullIfEmpty(s.ContainerID), s.Status, s.StartupCommand, s.Environment)

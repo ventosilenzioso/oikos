@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package stream;
+
+option go_package = "github.com/oikos/oikos/gen/go/stream";
+
+message CommandStream {
+  string command_id = 1;
+  string action = 2;
+  string server_id = 3;
+  map<string, string> args = 4;
+}
+
+message LogChunk {
+  string server_id = 1;
+  string line = 2;
+  int64 timestamp_unix = 3;
+}
