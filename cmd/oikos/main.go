@@ -159,12 +159,16 @@ func runInstall(args []string) error {
 	panel := fs.String("panel", "", "alamat panel (opsional, override default)")
 	token := fs.String("token", "", "pairing token sekali pakai")
 	name := fs.String("name", "", "nama node (default hostname)")
+	caPath := fs.String("ca-path", "", "path CA cert (opsional, override default)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	cfg := config.Default()
 	if *panel != "" {
 		cfg.Panel.Address = *panel
+	}
+	if *caPath != "" {
+		cfg.Panel.CAPath = *caPath
 	}
 	if *panel != "" {
 		nodeName := *name
