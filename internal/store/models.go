@@ -78,3 +78,13 @@ type SFTPCredential struct {
 	PublicKey    string
 	PasswordHash string
 }
+
+type Plugin struct {
+	ID               string
+	Name             string
+	Version          string
+	BinaryPath       string
+	Enabled          bool
+	SubscribedEvents string
+	InstalledAt      time.Time
+}

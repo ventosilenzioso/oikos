@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package plugin;
+
+option go_package = "github.com/oikos/oikos/gen/go/plugin";
+
+import "google/protobuf/empty.proto";
+
+message InitRequest {
+  string oikos_version = 1;
+  string config_path = 2;
+  string plugin_id = 3;
+}
+
+message Capability {
+  repeated string events = 1;
+  repeated string routes = 2;
+}
+
+message InitResponse {
+  Capability capabilities = 1;
+}
+
+message Event {
+  string type = 1;
+  string server_id = 2;
+  map<string, string> metadata = 3;
+}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string error = 2;
+}
+
+service PluginService {
+  rpc Init(InitRequest) returns (InitResponse);
+  rpc HandleEvent(Event) returns (google.protobuf.Empty);
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
+  rpc Close(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

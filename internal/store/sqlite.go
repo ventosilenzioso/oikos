@@ -48,6 +48,8 @@ var observabilityMigrationCandidates = []string{
 
 var filesystemMigrationCandidates = []string{"migrations/0004_filesystem_backup.sql", "../../migrations/0004_filesystem_backup.sql"}
 
+var pluginsMigrationCandidates = []string{"migrations/0005_plugins.sql", "../../migrations/0005_plugins.sql"}
+
 func (d *DB) Migrate() error {
 	var data []byte
 	var err error
@@ -66,7 +68,28 @@ func (d *DB) Migrate() error {
 	if err := d.MigrateObservability(); err != nil {
 		return err
 	}
-	return d.MigrateFilesystem()
+	if err := d.MigrateFilesystem(); err != nil {
+		return err
+	}
+	return d.MigratePlugins()
+}
+
+func (d *DB) MigratePlugins() error {
+	var data []byte
+	var err error
+	for _, p := range pluginsMigrationCandidates {
+		data, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("baca migrasi plugin: %w", err)
+	}
+	if _, err := d.sql.Exec(string(data)); err != nil {
+		return fmt.Errorf("aplikasi migrasi plugin: %w", err)
+	}
+	return nil
 }
 
 func (d *DB) MigrateFilesystem() error {
@@ -151,6 +174,71 @@ func (d *DB) ResetRestartCount(id string) error {
 
 func (d *DB) SetLastCrash(id string, at time.Time) error {
 	_, err := d.sql.Exec(`UPDATE servers SET last_crash_at=? WHERE id=?`, at.UTC().Format(time.RFC3339), id)
+	return err
+}
+
+func (d *DB) SavePlugin(p Plugin) error {
+	if p.SubscribedEvents == "" {
+		p.SubscribedEvents = "[]"
+	}
+	var valid int
+	if err := d.sql.QueryRow(`SELECT json_valid(?)`, p.SubscribedEvents).Scan(&valid); err != nil {
+		return err
+	}
+	if valid != 1 {
+		return fmt.Errorf("subscribed events plugin bukan JSON valid")
+	}
+	_, err := d.sql.Exec(`INSERT INTO plugins(id,name,version,binary_path,enabled,subscribed_events,installed_at)
+		VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(id) DO UPDATE SET name=excluded.name, version=excluded.version, binary_path=excluded.binary_path,
+			enabled=excluded.enabled, subscribed_events=excluded.subscribed_events, installed_at=excluded.installed_at`,
+		p.ID, p.Name, p.Version, p.BinaryPath, p.Enabled, p.SubscribedEvents, p.InstalledAt.UTC().Format(time.RFC3339))
+	return err
+}
+
+func (d *DB) GetPlugin(id string) (Plugin, error) {
+	var p Plugin
+	var installedAt string
+	var enabled int
+	err := d.sql.QueryRow(`SELECT id,name,version,binary_path,enabled,subscribed_events,installed_at FROM plugins WHERE id=?`, id).
+		Scan(&p.ID, &p.Name, &p.Version, &p.BinaryPath, &enabled, &p.SubscribedEvents, &installedAt)
+	if err != nil {
+		return Plugin{}, err
+	}
+	p.Enabled = enabled != 0
+	p.InstalledAt, err = time.Parse(time.RFC3339, installedAt)
+	if err != nil {
+		return Plugin{}, fmt.Errorf("parse installed_at: %w", err)
+	}
+	return p, nil
+}
+
+func (d *DB) ListPlugins() ([]Plugin, error) {
+	rows, err := d.sql.Query(`SELECT id,name,version,binary_path,enabled,subscribed_events,installed_at FROM plugins ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Plugin
+	for rows.Next() {
+		var p Plugin
+		var installedAt string
+		var enabled int
+		if err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.BinaryPath, &enabled, &p.SubscribedEvents, &installedAt); err != nil {
+			return nil, err
+		}
+		p.Enabled = enabled != 0
+		p.InstalledAt, err = time.Parse(time.RFC3339, installedAt)
+		if err != nil {
+			return nil, fmt.Errorf("parse installed_at: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) SetPluginEnabled(id string, enabled bool) error {
+	_, err := d.sql.Exec(`UPDATE plugins SET enabled=? WHERE id=?`, enabled, id)
 	return err
 }
 
