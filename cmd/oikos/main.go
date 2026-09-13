@@ -25,13 +25,17 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("no command (gunakan: server, install)")
+		return fmt.Errorf("no command (gunakan: server, install, daemon, diagnose)")
 	}
 	switch args[0] {
 	case "server":
 		return runServer(args[1:])
 	case "install":
 		return runInstall(args[1:])
+	case "daemon":
+		return runDaemon(args[1:])
+	case "diagnose":
+		return runDiagnose(args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}
@@ -48,6 +52,10 @@ func bindGlobal(fs *flag.FlagSet) {
 }
 
 func openLifecycle() (*orchestrator.Lifecycle, error) {
+	return openLifecycleWith(flagRuntime)
+}
+
+func openLifecycleWith(engine string) (*orchestrator.Lifecycle, error) {
 	cfg, err := config.Load(flagConfig)
 	if err != nil {
 		return nil, err
@@ -64,7 +72,7 @@ func openLifecycle() (*orchestrator.Lifecycle, error) {
 		return nil, err
 	}
 	var rt runtime.Runtime
-	if flagRuntime == "fake" {
+	if engine == "fake" {
 		rt = runtime.NewFake()
 	} else {
 		rt, err = docker.New(cfg.Runtime.DockerSocket)
