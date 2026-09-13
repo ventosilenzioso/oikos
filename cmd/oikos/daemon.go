@@ -10,9 +10,14 @@ import (
 	"path/filepath"
 	"syscall"
 
+	tunnelpb "github.com/oikos/oikos/gen/go/tunnel"
 	"github.com/oikos/oikos/internal/agent"
 	"github.com/oikos/oikos/internal/config"
+	"github.com/oikos/oikos/internal/orchestrator"
+	"github.com/oikos/oikos/internal/runtime"
+	"github.com/oikos/oikos/internal/runtime/docker"
 	"github.com/oikos/oikos/internal/store"
+	"github.com/oikos/oikos/internal/tunnel"
 )
 
 func runDaemon(args []string) error {
@@ -26,15 +31,14 @@ func runDaemon(args []string) error {
 		return err
 	}
 	flagConfig = *configPath
-	lc, err := openLifecycleWith(cfg.Runtime.Engine)
-	if err != nil {
-		return err
-	}
 	db, err := store.Open(filepath.Join(cfg.Node.DataDir, "oikos.db"))
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	if err := db.MigrateNetworking(); err != nil {
+		return err
+	}
 	node, err := db.GetNode()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -44,6 +48,27 @@ func runDaemon(args []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	conn, err := agent.DialPanel(ctx, cfg.Panel.Address, node.CertPath, node.KeyPath, cfg.Panel.CAPath)
+	if err != nil {
+		return err
+	}
+	var rt runtime.Runtime
+	if cfg.Runtime.Engine == "fake" {
+		rt = runtime.NewFake()
+	} else {
+		rt, err = docker.New(cfg.Runtime.DockerSocket)
+		if err != nil {
+			return err
+		}
+	}
+	bus := orchestrator.NewEventBus()
+	lc := orchestrator.New(db, rt, bus)
+	defer conn.Close()
+	tunnelClient := tunnelpb.NewTunnelServiceClient(conn)
+	manager, err := tunnel.NewFromConfig(cfg.Runtime, tunnel.NewPanelAllocator(tunnelClient, node.ID), db, func(typ, serverID string) { bus.Publish(orchestrator.Event{Type: typ, ServerID: serverID}) })
+	if err != nil {
+		return err
+	}
 	return agent.Run(ctx, agent.DaemonArgs{
 		PanelAddr: cfg.Panel.Address,
 		CertPath:  node.CertPath,
@@ -51,5 +76,6 @@ func runDaemon(args []string) error {
 		CAPath:    cfg.Panel.CAPath,
 		NodeID:    node.ID,
 		LocalPort: cfg.API.LocalGRPCPort,
+		Tunnel:    manager,
 	}, lc)
 }

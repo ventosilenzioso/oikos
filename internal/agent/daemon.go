@@ -9,6 +9,7 @@ import (
 	nodepb "github.com/oikos/oikos/gen/go/node"
 	"github.com/oikos/oikos/internal/api"
 	"github.com/oikos/oikos/internal/orchestrator"
+	"github.com/oikos/oikos/internal/tunnel"
 )
 
 // DaemonArgs adalah parameter loop daemon.
@@ -19,6 +20,7 @@ type DaemonArgs struct {
 	CAPath    string
 	NodeID    string
 	LocalPort int
+	Tunnel    tunnel.Manager
 }
 
 // Run menjalankan loop daemon: serve API lokal, dial Panel, heartbeat +
@@ -31,6 +33,12 @@ func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error
 	apiSrv := api.NewServer(lc)
 	go func() { _ = apiSrv.Serve(lis) }()
 	defer apiSrv.GracefulStop()
+	if args.Tunnel != nil {
+		tunnelCtx, cancelTunnel := context.WithCancel(ctx)
+		defer cancelTunnel()
+		go args.Tunnel.Watch(tunnelCtx)
+		defer args.Tunnel.Close(context.Background())
+	}
 
 	since := time.Now()
 	attempt := 0

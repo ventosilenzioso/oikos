@@ -11,17 +11,36 @@ import (
 	"github.com/oikos/oikos/internal/resource"
 	"github.com/oikos/oikos/internal/runtime"
 	"github.com/oikos/oikos/internal/store"
+	"github.com/oikos/oikos/internal/tunnel"
 )
 
 // Lifecycle mengatur siklus hidup server: create/start/stop/restart/delete.
 type Lifecycle struct {
-	db  *store.DB
-	rt  runtime.Runtime
-	bus *EventBus
+	db      *store.DB
+	rt      runtime.Runtime
+	bus     *EventBus
+	tunnels tunnel.Manager
+	ports   PortProvider
 }
 
 func New(db *store.DB, rt runtime.Runtime, bus *EventBus) *Lifecycle {
-	return &Lifecycle{db: db, rt: rt, bus: bus}
+	return NewWithTunnel(db, rt, bus, nil, nil)
+}
+
+// PortProvider memasok port yang didefinisikan egg. Lifecycle tidak membaca
+// port dari environment server agar kontrak tunnel tetap eksplisit.
+type PortProvider interface {
+	Ports(context.Context, string) ([]tunnel.PortMapping, error)
+}
+
+type PortProviderFunc func(context.Context, string) ([]tunnel.PortMapping, error)
+
+func (f PortProviderFunc) Ports(ctx context.Context, eggID string) ([]tunnel.PortMapping, error) {
+	return f(ctx, eggID)
+}
+
+func NewWithTunnel(db *store.DB, rt runtime.Runtime, bus *EventBus, tunnels tunnel.Manager, ports PortProvider) *Lifecycle {
+	return &Lifecycle{db: db, rt: rt, bus: bus, tunnels: tunnels, ports: ports}
 }
 
 func (l *Lifecycle) CreateServer(ctx context.Context, name, eggID, startup string, env map[string]string) (string, error) {
@@ -41,6 +60,20 @@ func (l *Lifecycle) CreateServer(ctx context.Context, name, eggID, startup strin
 	}
 	if err := l.db.UpdateServerStatus(id, "stopped"); err != nil {
 		return "", fmt.Errorf("update status: %w", err)
+	}
+	if l.tunnels != nil && l.ports != nil {
+		mappings, err := l.ports.Ports(ctx, eggID)
+		if err != nil {
+			_ = l.db.DeleteServer(id)
+			return "", fmt.Errorf("ambil port egg: %w", err)
+		}
+		for _, mapping := range mappings {
+			mapping.ServerID = id
+			if _, err := l.tunnels.RegisterPort(ctx, mapping); err != nil {
+				_ = l.db.DeleteServer(id)
+				return "", fmt.Errorf("register tunnel: %w", err)
+			}
+		}
 	}
 	l.bus.Publish(Event{Type: "server.created", ServerID: id})
 	return id, nil
@@ -150,6 +183,11 @@ func (l *Lifecycle) DeleteServer(ctx context.Context, id string) error {
 	if s.ContainerID != "" {
 		if err := l.rt.Delete(ctx, s.ContainerID, true); err != nil {
 			return fmt.Errorf("runtime delete: %w", err)
+		}
+	}
+	if l.tunnels != nil {
+		if err := l.tunnels.ReleaseServer(ctx, id); err != nil {
+			return fmt.Errorf("release tunnel: %w", err)
 		}
 	}
 	if err := l.db.DeleteServer(id); err != nil {

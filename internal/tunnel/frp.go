@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/oikos/oikos/internal/store"
 )
@@ -92,6 +93,26 @@ func (m *FrpManager) ReleasePort(ctx context.Context, serverID string, localPort
 	return m.rebuildLocked(ctx)
 }
 
+func (m *FrpManager) ReleaseServer(ctx context.Context, serverID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tunnels, err := m.store.ListTunnels(serverID)
+	if err != nil {
+		return err
+	}
+	for _, t := range tunnels {
+		if err := m.allocator.Release(ctx, PortMapping{TunnelID: t.ID, ServerID: t.ServerID, LocalPort: t.LocalPort, RemotePort: t.RemotePort, Protocol: t.Protocol}); err != nil {
+			return err
+		}
+		if err := m.store.DeleteTunnelByMapping(serverID, t.LocalPort, t.Protocol); err != nil {
+			return err
+		}
+		delete(m.mappings, t.ID)
+		m.emit("tunnel.disconnected", serverID)
+	}
+	return m.rebuildLocked(ctx)
+}
+
 func (m *FrpManager) Status(ctx context.Context, serverID string) ([]TunnelStatus, error) {
 	tunnels, err := m.store.ListTunnels(serverID)
 	if err != nil {
@@ -144,4 +165,47 @@ func (m *FrpManager) Close(ctx context.Context) error {
 		close(m.closed)
 	}
 	return m.process.Stop(ctx)
+}
+
+// Watch mengawasi child frpc dan mencoba reload kembali saat proses berhenti.
+// Retry policy detail dan alerting tetap menjadi tanggung jawab Fase 3.
+func (m *FrpManager) Watch(ctx context.Context) {
+	attempt := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case _, ok := <-m.process.Wait():
+			if !ok {
+				return
+			}
+			m.emit("tunnel.disconnected", "")
+			attempt++
+			select {
+			case <-ctx.Done():
+				return
+			case <-contextAfter(ctx, backoff(attempt)):
+			}
+			if err := m.Reload(ctx); err == nil {
+				attempt = 0
+			}
+		}
+	}
+}
+
+func backoff(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+	d := time.Second << min(attempt-1, 4)
+	if d > 30*time.Second {
+		return 30 * time.Second
+	}
+	return d
+}
+
+func contextAfter(ctx context.Context, d time.Duration) <-chan time.Time {
+	t := time.NewTimer(d)
+	go func() { <-ctx.Done(); t.Stop() }()
+	return t.C
 }

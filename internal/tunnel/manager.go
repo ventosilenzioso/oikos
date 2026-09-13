@@ -28,6 +28,9 @@ type Assignment struct {
 type Manager interface {
 	RegisterPort(context.Context, PortMapping) (Assignment, error)
 	ReleasePort(context.Context, string, int) error
+	ReleaseServer(context.Context, string) error
 	Status(context.Context, string) ([]TunnelStatus, error)
 	Reload(context.Context) error
+	Watch(context.Context)
+	Close(context.Context) error
 }
