@@ -73,3 +73,21 @@ Implemented versioned update slots and release verification in `internal/update`
 - `go vet ./...` PASS
 - `gofmt -w internal/update/*.go` applied
 - `git diff --check` PASS
+Task 5: fix round 2/5 — high rollback projection failure authoritative state wrong; medium post-switch health projection repair ignored; medium partial mutation/recovery coverage
+
+## Task 5 Fix Round: Recovery Guarantees
+
+- Rollback now treats the pre-rollback `state.json` as authoritative until projection succeeds. If projection fails, it restores the prior manifest and attempts to repair projections from that prior state before returning an error.
+- Post-switch health failure now uses the same restoration path, restoring the prior manifest and projections rather than silently ignoring projection-repair errors.
+- Recovery errors preserve the original operation failure and append manifest/projection restoration diagnostics, including failures during recovery itself.
+- Projection callbacks are exercised with partial mutation: tests remove or alter a projection before returning an error, then verify state recovery behavior.
+- Added rollback projection-failure, rollback recovery-failure diagnostics, and post-switch health projection-recovery failure tests.
+- Reserved slot protection, active/previous slot protection, mandatory signature verification, and exact lowercase SHA-256 validation remain unchanged.
+
+## Fix Round Verification
+
+- `go test ./internal/update/ -v` PASS
+- `go test ./...` PASS
+- `go vet ./...` PASS
+- `gofmt -w internal/update/*.go` applied
+- `git diff --check` PASS

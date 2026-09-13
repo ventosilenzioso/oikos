@@ -95,21 +95,11 @@ func (m *manager) Apply(release Release) error {
 		return err
 	}
 	if err := m.config.projectState(newState); err != nil {
-		if restoreErr := m.config.saveState(state); restoreErr != nil {
-			return fmt.Errorf("project slot state: %w; restore manifest: %v", err, restoreErr)
-		}
-		if restoreErr := m.config.projectStateDirect(state); restoreErr != nil {
-			return fmt.Errorf("project slot state: %w; restore projections: %v", err, restoreErr)
-		}
-		return err
+		return m.config.restoreState(state, fmt.Errorf("project slot state: %w", err))
 	}
 	if m.health != nil {
 		if err := m.health.Run(filepath.Join(m.config.Root, "current")); err != nil {
-			if rollbackErr := m.config.saveState(state); rollbackErr != nil {
-				return fmt.Errorf("post-switch health check: %w; restore: %v", err, rollbackErr)
-			}
-			_ = m.config.projectState(state)
-			return fmt.Errorf("post-switch health check: %w", err)
+			return m.config.restoreState(state, fmt.Errorf("post-switch health check: %w", err))
 		}
 	}
 	return nil
@@ -131,7 +121,7 @@ func (m *manager) Rollback() error {
 		return err
 	}
 	if err := m.config.projectState(newState); err != nil {
-		return err
+		return m.config.restoreState(state, fmt.Errorf("rollback projection: %w", err))
 	}
 	return nil
 }

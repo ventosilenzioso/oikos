@@ -89,7 +89,9 @@ func (c SlotConfig) saveState(state slotState) error {
 
 func (c SlotConfig) projectState(state slotState) error {
 	if c.Project != nil {
-		return c.Project()
+		if err := c.Project(); err != nil {
+			return err
+		}
 	}
 	return c.projectStateDirect(state)
 }
@@ -103,6 +105,16 @@ func (c SlotConfig) projectStateDirect(state slotState) error {
 	}
 	_ = os.Remove(filepath.Join(c.Root, "previous"))
 	return nil
+}
+
+func (c SlotConfig) restoreState(state slotState, cause error) error {
+	if err := c.saveState(state); err != nil {
+		return fmt.Errorf("%w; restore manifest: %v", cause, err)
+	}
+	if err := c.projectState(state); err != nil {
+		return fmt.Errorf("%w; restore projections: %v", cause, err)
+	}
+	return cause
 }
 
 func replaceSymlink(root, name, target string) error {

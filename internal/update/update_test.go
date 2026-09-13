@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -295,14 +296,18 @@ func TestApplyProjectionFailureRestoresPriorManifestAndProjections(t *testing.T)
 	projectCalls := 0
 	mgr := NewManager(SlotConfig{Root: root, Project: func() error {
 		projectCalls++
-		return errors.New("projection failed")
+		if projectCalls == 1 {
+			_ = os.Remove(filepath.Join(root, "current"))
+			return errors.New("projection failed")
+		}
+		return nil
 	}}, testVerifier{}, nil)
 	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
 	if err == nil {
 		t.Fatal("Apply succeeded despite projection failure")
 	}
-	if projectCalls != 1 {
-		t.Fatalf("projection calls = %d, want 1", projectCalls)
+	if projectCalls != 2 {
+		t.Fatalf("projection calls = %d, want 2", projectCalls)
 	}
 	state, err := mgr.(*manager).config.loadState()
 	if err != nil {
@@ -316,6 +321,93 @@ func TestApplyProjectionFailureRestoresPriorManifestAndProjections(t *testing.T)
 	}
 	if _, err := os.Lstat(filepath.Join(root, "previous")); !os.IsNotExist(err) {
 		t.Fatalf("previous projection after recovery: %v", err)
+	}
+}
+
+func TestRollbackProjectionFailureRestoresPriorManifest(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	writeSlot(t, root, "v2", "candidate")
+	link(t, filepath.Join(root, "current"), "v2")
+	link(t, filepath.Join(root, "previous"), "v1")
+	projectCalls := 0
+	mgr := NewManager(SlotConfig{Root: root, Project: func() error {
+		projectCalls++
+		if projectCalls == 1 {
+			_ = os.Remove(filepath.Join(root, "current"))
+			return errors.New("rollback projection failed")
+		}
+		return nil
+	}}, testVerifier{}, nil)
+	if err := mgr.Rollback(); err == nil {
+		t.Fatal("Rollback succeeded despite projection failure")
+	} else if !strings.Contains(err.Error(), "rollback projection failed") {
+		t.Fatalf("rollback error = %q, missing projection failure", err)
+	}
+	state, err := mgr.(*manager).config.loadState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Current != "v2" || state.Previous != "v1" {
+		t.Fatalf("state after rollback failure = %+v, want v2/v1", state)
+	}
+}
+
+func TestRollbackRecoveryFailureIncludesDiagnosticsAndPriorState(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	writeSlot(t, root, "v2", "candidate")
+	link(t, filepath.Join(root, "current"), "v2")
+	link(t, filepath.Join(root, "previous"), "v1")
+	projectCalls := 0
+	mgr := NewManager(SlotConfig{Root: root, Project: func() error {
+		projectCalls++
+		return fmt.Errorf("projection failure %d", projectCalls)
+	}}, testVerifier{}, nil)
+	err := mgr.Rollback()
+	if err == nil {
+		t.Fatal("Rollback succeeded despite projection and recovery failures")
+	}
+	if !strings.Contains(err.Error(), "rollback projection") || !strings.Contains(err.Error(), "projection failure 2") {
+		t.Fatalf("rollback recovery error = %q, missing diagnostics", err)
+	}
+	state, stateErr := mgr.(*manager).config.loadState()
+	if stateErr != nil {
+		t.Fatal(stateErr)
+	}
+	if state.Current != "v2" || state.Previous != "v1" {
+		t.Fatalf("state after rollback recovery failure = %+v, want v2/v1", state)
+	}
+}
+
+func TestPostSwitchHealthFailureSurfacesProjectionRecoveryFailure(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	projectCalls := 0
+	mgr := NewManager(SlotConfig{Root: root, Project: func() error {
+		projectCalls++
+		if projectCalls == 2 {
+			return errors.New("recovery projection failed")
+		}
+		return nil
+	}}, testVerifier{}, &testHealth{errs: []error{nil, errors.New("post-switch unhealthy")}})
+	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
+	if err == nil {
+		t.Fatal("Apply succeeded despite post-switch health failure")
+	}
+	if !strings.Contains(err.Error(), "post-switch unhealthy") || !strings.Contains(err.Error(), "recovery projection failed") {
+		t.Fatalf("health recovery error = %q, missing diagnostics", err)
+	}
+	state, stateErr := mgr.(*manager).config.loadState()
+	if stateErr != nil {
+		t.Fatal(stateErr)
+	}
+	if state.Current != "v1" || state.Previous != "" {
+		t.Fatalf("state after health recovery failure = %+v, want v1/no previous", state)
 	}
 }
 
