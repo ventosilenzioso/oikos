@@ -5,7 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
+	"path/filepath"
+	"regexp"
 )
 
 type Release struct {
@@ -22,24 +23,35 @@ type ReleaseVerifier interface {
 }
 
 func verifyRelease(release Release, body []byte, verifier ReleaseVerifier) error {
-	if release.Version == "" {
-		return errors.New("release version is required")
+	if err := validateVersion(release.Version); err != nil {
+		return err
 	}
 	if release.BinaryURL == "" {
 		return errors.New("release binary URL is required")
 	}
-	want := strings.ToLower(strings.TrimSpace(release.SHA256))
-	if len(want) != sha256.Size*2 {
+	want := release.SHA256
+	if !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(want) {
 		return errors.New("release SHA-256 is invalid")
 	}
 	sum := sha256.Sum256(body)
 	if got := hex.EncodeToString(sum[:]); got != want {
 		return fmt.Errorf("release checksum mismatch: got %s, want %s", got, want)
 	}
-	if verifier != nil {
-		if err := verifier.Verify(release, body); err != nil {
-			return fmt.Errorf("release signature verification failed: %w", err)
-		}
+	if verifier == nil {
+		return errors.New("release verifier is required")
+	}
+	if len(release.Signature) == 0 {
+		return errors.New("release signature is required")
+	}
+	if err := verifier.Verify(release, body); err != nil {
+		return fmt.Errorf("release signature verification failed: %w", err)
+	}
+	return nil
+}
+
+func validateVersion(version string) error {
+	if version == "" || version == "." || version == ".." || filepath.Base(version) != version || filepath.IsAbs(version) {
+		return fmt.Errorf("invalid release version %q", version)
 	}
 	return nil
 }

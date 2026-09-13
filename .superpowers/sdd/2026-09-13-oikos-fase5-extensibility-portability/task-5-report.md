@@ -40,3 +40,20 @@ Implemented versioned update slots and release verification in `internal/update`
 
 - The `HealthRunner` contract is intentionally narrow: it receives the candidate path before switching and the `current` symlink path after switching. Container lifecycle management remains outside this package, so updates never stop containers here.
 - Signature semantics are delegated to the injected verifier; this package defines the interface but does not prescribe a cryptographic algorithm or key store.
+
+## Reviewer Follow-up
+
+- Added strict release-version validation: only a single safe slot-name component is accepted; empty, dot, dot-dot, absolute, separator, and traversal names are rejected before any candidate removal or symlink projection.
+- Added destructive-path regression coverage proving unsafe versions cannot delete an existing sentinel path.
+- Added `state.json` as the authoritative current/previous pair. It is replaced through a temporary file and rename, while `current` and `previous` symlinks are compatibility projections repaired from the manifest. Apply and rollback load the manifest, so a missing projection recovers deterministically.
+- Made release verification mandatory: a non-nil `ReleaseVerifier` and non-empty signature are required.
+- SHA-256 input now requires exactly 64 lowercase hexadecimal characters. Uppercase and surrounding whitespace are rejected without normalization.
+- Added verifier failure, backup failure, candidate health failure, and state consistency tests.
+
+## Follow-up Verification
+
+- `go test ./internal/update/ -v` PASS
+- `go test ./...` PASS
+- `go vet ./...` PASS
+- `gofmt -w internal/update/*.go` applied
+- `git diff --check` PASS

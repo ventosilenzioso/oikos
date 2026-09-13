@@ -47,7 +47,7 @@ func (m *manager) Apply(release Release) error {
 	if err := verifyRelease(release, body, m.verify); err != nil {
 		return err
 	}
-	oldCurrent, err := os.Readlink(filepath.Join(m.config.Root, "current"))
+	state, err := m.config.loadState()
 	if err != nil {
 		return fmt.Errorf("read current slot: %w", err)
 	}
@@ -87,14 +87,19 @@ func (m *manager) Apply(release Release) error {
 			return fmt.Errorf("candidate health check: %w", err)
 		}
 	}
-	if err := m.config.switchTo(release.Version); err != nil {
+	newState := slotState{Current: release.Version, Previous: state.Current}
+	if err := m.config.saveState(newState); err != nil {
+		return err
+	}
+	if err := m.config.projectState(newState); err != nil {
 		return err
 	}
 	if m.health != nil {
 		if err := m.health.Run(filepath.Join(m.config.Root, "current")); err != nil {
-			if rollbackErr := replaceSymlink(m.config.Root, "current", oldCurrent); rollbackErr != nil {
+			if rollbackErr := m.config.saveState(state); rollbackErr != nil {
 				return fmt.Errorf("post-switch health check: %w; restore: %v", err, rollbackErr)
 			}
+			_ = m.config.projectState(state)
 			return fmt.Errorf("post-switch health check: %w", err)
 		}
 	}
@@ -105,18 +110,18 @@ func (m *manager) Rollback() error {
 	if err := m.config.validate(); err != nil {
 		return err
 	}
-	previous, err := os.Readlink(filepath.Join(m.config.Root, "previous"))
+	state, err := m.config.loadState()
 	if err != nil {
 		return fmt.Errorf("read previous slot: %w", err)
 	}
-	current, err := os.Readlink(filepath.Join(m.config.Root, "current"))
-	if err != nil {
-		return fmt.Errorf("read current slot: %w", err)
+	if state.Previous == "" {
+		return fmt.Errorf("previous slot is unavailable")
 	}
-	if err := replaceSymlink(m.config.Root, "current", previous); err != nil {
+	newState := slotState{Current: state.Previous, Previous: state.Current}
+	if err := m.config.saveState(newState); err != nil {
 		return err
 	}
-	if err := replaceSymlink(m.config.Root, "previous", current); err != nil {
+	if err := m.config.projectState(newState); err != nil {
 		return err
 	}
 	return nil

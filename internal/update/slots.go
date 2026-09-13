@@ -1,6 +1,7 @@
 package update
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,11 @@ type SlotConfig struct {
 	Backup func() error
 }
 
+type slotState struct {
+	Current  string `json:"current"`
+	Previous string `json:"previous"`
+}
+
 func (c SlotConfig) validate() error {
 	if c.Root == "" {
 		return errors.New("slot root is required")
@@ -19,20 +25,75 @@ func (c SlotConfig) validate() error {
 	return nil
 }
 
-func (c SlotConfig) switchTo(target string) error {
-	current := filepath.Join(c.Root, "current")
-	previous := filepath.Join(c.Root, "previous")
-	old, err := os.Readlink(current)
+func (c SlotConfig) loadState() (slotState, error) {
+	data, err := os.ReadFile(filepath.Join(c.Root, "state.json"))
+	if err == nil {
+		var state slotState
+		if err := json.Unmarshal(data, &state); err != nil {
+			return slotState{}, fmt.Errorf("decode slot state: %w", err)
+		}
+		if err := validateVersion(state.Current); err != nil {
+			return slotState{}, fmt.Errorf("invalid current slot state: %w", err)
+		}
+		if state.Previous != "" {
+			if err := validateVersion(state.Previous); err != nil {
+				return slotState{}, fmt.Errorf("invalid previous slot state: %w", err)
+			}
+		}
+		return state, nil
+	}
+	if !os.IsNotExist(err) {
+		return slotState{}, err
+	}
+	current, err := os.Readlink(filepath.Join(c.Root, "current"))
 	if err != nil {
-		return fmt.Errorf("read current slot: %w", err)
+		return slotState{}, fmt.Errorf("read current slot: %w", err)
 	}
-	if err := replaceSymlink(c.Root, "previous", old); err != nil {
+	if err := validateVersion(current); err != nil {
+		return slotState{}, err
+	}
+	previous, _ := os.Readlink(filepath.Join(c.Root, "previous"))
+	if previous != "" {
+		if err := validateVersion(previous); err != nil {
+			return slotState{}, err
+		}
+	}
+	return slotState{Current: current, Previous: previous}, nil
+}
+
+func (c SlotConfig) saveState(state slotState) error {
+	data, err := json.Marshal(state)
+	if err != nil {
 		return err
 	}
-	if err := replaceSymlink(c.Root, "current", target); err != nil {
+	tmp, err := os.CreateTemp(c.Root, ".state-")
+	if err != nil {
 		return err
 	}
-	_ = previous
+	path := tmp.Name()
+	defer os.Remove(path)
+	if err := tmp.Chmod(0o644); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(path, filepath.Join(c.Root, "state.json"))
+}
+
+func (c SlotConfig) projectState(state slotState) error {
+	if err := replaceSymlink(c.Root, "current", state.Current); err != nil {
+		return err
+	}
+	if state.Previous != "" {
+		return replaceSymlink(c.Root, "previous", state.Previous)
+	}
+	_ = os.Remove(filepath.Join(c.Root, "previous"))
 	return nil
 }
 

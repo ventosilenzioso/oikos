@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -39,7 +40,7 @@ func TestApplyChecksumMismatchLeavesCurrentUnchanged(t *testing.T) {
 	defer server.Close()
 	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, &testHealth{})
 
-	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: "0000000000000000000000000000000000000000000000000000000000000000"})
+	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: "0000000000000000000000000000000000000000000000000000000000000000", Signature: []byte("signature")})
 	if err == nil {
 		t.Fatal("Apply succeeded with a checksum mismatch")
 	}
@@ -59,7 +60,7 @@ func TestApplySwitchesAtomicallyAndRollbackRestoresPrevious(t *testing.T) {
 	backupCalls := 0
 	health := &testHealth{}
 	mgr := NewManager(SlotConfig{Root: root, Backup: func() error { backupCalls++; return nil }}, testVerifier{}, health)
-	release := Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body)}
+	release := Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")}
 	if err := mgr.Apply(release); err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +94,7 @@ func TestApplyHealthFailureBeforeSwitchPreservesKnownGood(t *testing.T) {
 	health := &testHealth{errs: []error{errors.New("unhealthy")}}
 	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, health)
 
-	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body)})
+	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
 	if err == nil {
 		t.Fatal("Apply succeeded with an unhealthy candidate")
 	}
@@ -115,15 +116,15 @@ func TestApplyHealthFailureAfterSwitchRestoresKnownGood(t *testing.T) {
 	health := &testHealth{errs: []error{nil, errors.New("unhealthy")}}
 	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, health)
 
-	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body)})
+	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
 	if err == nil {
 		t.Fatal("Apply succeeded with an unhealthy switched slot")
 	}
 	if got := linkTarget(t, filepath.Join(root, "current")); got != "v1" {
 		t.Fatalf("current target = %q, want v1", got)
 	}
-	if got := linkTarget(t, filepath.Join(root, "previous")); got != "v1" {
-		t.Fatalf("previous target = %q, want v1", got)
+	if _, err := os.Lstat(filepath.Join(root, "previous")); !os.IsNotExist(err) {
+		t.Fatalf("previous projection exists after restoring state: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "v2")); err != nil {
 		t.Fatalf("candidate slot was deleted: %v", err)
@@ -152,6 +153,107 @@ func TestApplyVerifiesSignatureAndMakesCandidateExecutable(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o755 {
 		t.Fatalf("candidate mode = %o, want 755", info.Mode().Perm())
+	}
+}
+
+func TestApplyRejectsUnsafeVersionWithoutDeletingExistingPath(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	sentinel := filepath.Join(root, "sentinel")
+	writeSlot(t, root, "sentinel", "do not delete")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, nil)
+	for _, version := range []string{"", ".", "..", "../sentinel", "/tmp/evil", "nested/v2"} {
+		t.Run(version, func(t *testing.T) {
+			err := mgr.Apply(Release{Version: version, BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
+			if err == nil {
+				t.Fatal("Apply accepted unsafe version")
+			}
+		})
+	}
+	if got, err := os.ReadFile(sentinel); err != nil || string(got) != "do not delete" {
+		t.Fatalf("sentinel changed: %q, %v", got, err)
+	}
+}
+
+func TestApplyRequiresExactLowercaseChecksum(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, nil)
+	valid := checksum(body)
+	for _, digest := range []string{strings.ToUpper(valid), " " + valid, valid + " "} {
+		t.Run(digest, func(t *testing.T) {
+			if err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: digest, Signature: []byte("signature")}); err == nil {
+				t.Fatal("Apply accepted non-exact checksum")
+			}
+		})
+	}
+}
+
+func TestApplyRequiresVerifierAndSignature(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	release := Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body)}
+	if err := NewManager(SlotConfig{Root: root}, nil, nil).Apply(release); err == nil {
+		t.Fatal("Apply accepted nil verifier")
+	}
+	if err := NewManager(SlotConfig{Root: root}, testVerifier{}, nil).Apply(release); err == nil {
+		t.Fatal("Apply accepted empty signature")
+	}
+}
+
+func TestApplyVerifierAndBackupFailuresPreserveCurrent(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	release := Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")}
+	if err := NewManager(SlotConfig{Root: root, Backup: func() error { return errors.New("backup failed") }}, testVerifier{}, nil).Apply(release); err == nil {
+		t.Fatal("Apply accepted backup failure")
+	}
+	if err := NewManager(SlotConfig{Root: root}, testVerifier{err: errors.New("bad signature")}, nil).Apply(release); err == nil {
+		t.Fatal("Apply accepted verifier failure")
+	}
+	if got := linkTarget(t, filepath.Join(root, "current")); got != "v1" {
+		t.Fatalf("current target = %q, want v1", got)
+	}
+}
+
+func TestStateManifestKeepsSlotsConsistentAcrossManagerInstances(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	release := Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")}
+	if err := NewManager(SlotConfig{Root: root}, testVerifier{}, nil).Apply(release); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "current")); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewManager(SlotConfig{Root: root}, testVerifier{}, nil).Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if got := linkTarget(t, filepath.Join(root, "current")); got != "v1" {
+		t.Fatalf("current target = %q, want v1", got)
+	}
+	if got := linkTarget(t, filepath.Join(root, "previous")); got != "v2" {
+		t.Fatalf("previous target = %q, want v2", got)
 	}
 }
 
