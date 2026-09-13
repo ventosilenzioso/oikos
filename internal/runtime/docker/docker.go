@@ -151,9 +151,6 @@ func (d *dockerRuntime) Exec(ctx context.Context, containerID string, cmd []stri
 		return "", fmt.Errorf("exec attach: %w", err)
 	}
 	defer attach.Close()
-	if err := d.cli.ContainerExecStart(ctx, execResp.ID, container.ExecStartOptions{Detach: false}); err != nil {
-		return "", fmt.Errorf("exec start: %w", err)
-	}
 	var out bytes.Buffer
 	if _, err := stdcopy.StdCopy(&out, &out, attach.Reader); err != nil {
 		return "", fmt.Errorf("exec baca output: %w", err)
