@@ -34,6 +34,8 @@ func run(args []string) error {
 		return runInstall(args[1:])
 	case "daemon":
 		return runDaemon(args[1:])
+	case "doctor":
+		return runDoctor(args[1:])
 	case "diagnose":
 		return runDiagnose(args[1:])
 	case "update":
