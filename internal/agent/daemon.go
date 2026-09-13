@@ -23,11 +23,19 @@ type DaemonArgs struct {
 	Tunnel        tunnel.Manager
 	Observability *api.ObservabilityService
 	Filesystem    *api.FilesystemService
+	Handoff       func()
+}
+
+func (a DaemonArgs) TriggerHandoff() {
+	if a.Handoff != nil {
+		a.Handoff()
+	}
 }
 
 // Run menjalankan loop daemon: serve API lokal, dial Panel, heartbeat +
 // command stream, reconnect dengan backoff. Kembali hanya saat ctx selesai.
 func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error {
+	defer args.TriggerHandoff()
 	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", args.LocalPort))
 	if err != nil {
 		return fmt.Errorf("listen api lokal: %w", err)

@@ -12,6 +12,10 @@ type HealthRunner interface {
 	Run(string) error
 }
 
+type HealthRunnerFunc func(string) error
+
+func (f HealthRunnerFunc) Run(path string) error { return f(path) }
+
 type UpdateManager interface {
 	Check(Release) error
 	Apply(Release) error
