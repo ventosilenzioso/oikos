@@ -2,8 +2,3 @@ bin/
 *.db
 *.db-wal
 *.db-shm
-.superpowers/
-artifacts/
-opencode.json
-oikos-rencana-kerja-lengkap.md
-.worktrees/
