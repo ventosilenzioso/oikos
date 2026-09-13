@@ -1,0 +1,13 @@
+node:
+  data_dir: "/var/lib/oikos"
+  cert_path: "/etc/oikos/certs/node.crt"
+  key_path: "/etc/oikos/certs/node.key"
+panel:
+  address: "panel.example.com:9091"
+runtime:
+  engine: "docker"
+  docker_socket: "unix:///var/run/docker.sock"
+api:
+  local_grpc_port: 9190
+log:
+  level: "info"
