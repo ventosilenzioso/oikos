@@ -104,6 +104,13 @@ func runDoctor(args []string) error {
 			}
 			return doctorWarn, "AppArmor/SELinux tidak tersedia; fallback aktif"
 		}},
+		{Name: "user_namespace", Required: false, Run: func() (doctorResult, string) {
+			status, err := security.ApplyUserNamespace(security.DetectUserNamespace(false), false, false)
+			if err != nil {
+				return doctorWarn, err.Error()
+			}
+			return doctorWarn, "not enabled by default; mode=" + status.Mode
+		}},
 		{Name: "panel.mtls", Required: false, Run: func() (doctorResult, string) {
 			if db == nil {
 				return doctorWarn, "skipped: SQLite unavailable"
