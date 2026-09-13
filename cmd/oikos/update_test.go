@@ -21,16 +21,18 @@ func TestRunUpdateSwitchesSlotAndBacksUpConfigAndDatabase(t *testing.T) {
 	versions := filepath.Join(root, "versions")
 	configPath := filepath.Join(root, "config.yaml")
 	manifestPath := filepath.Join(root, "plugins.yaml")
+	configBytes := []byte("node:\n  data_dir: " + dataDir + "\nplugins:\n  manifest_path: " + manifestPath + "\n")
+	databaseBytes := []byte("database")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(configPath, []byte("node:\n  data_dir: "+dataDir+"\nplugins:\n  manifest_path: "+manifestPath+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(configPath, configBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(manifestPath, []byte("plugin-manifest"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dataDir, "oikos.db"), []byte("database"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "oikos.db"), databaseBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	writeUpdateSlot(t, versions, "v1")
@@ -57,6 +59,14 @@ func TestRunUpdateSwitchesSlotAndBacksUpConfigAndDatabase(t *testing.T) {
 	backupFiles, err := os.ReadDir(filepath.Join(versions, "backups", entries[0].Name()))
 	if err != nil || len(backupFiles) != 3 {
 		t.Fatalf("backup files = %d, err = %v", len(backupFiles), err)
+	}
+	configBackup, err := os.ReadFile(filepath.Join(versions, "backups", entries[0].Name(), "config.yaml"))
+	if err != nil || !reflect.DeepEqual(configBackup, configBytes) {
+		t.Fatalf("config backup = %q, err = %v", configBackup, err)
+	}
+	databaseBackup, err := os.ReadFile(filepath.Join(versions, "backups", entries[0].Name(), "oikos.db"))
+	if err != nil || !reflect.DeepEqual(databaseBackup, databaseBytes) {
+		t.Fatalf("database backup = %q, err = %v", databaseBackup, err)
 	}
 	manifest, err := os.ReadFile(filepath.Join(versions, "backups", entries[0].Name(), "plugins.yaml"))
 	if err != nil || string(manifest) != "plugin-manifest" {
