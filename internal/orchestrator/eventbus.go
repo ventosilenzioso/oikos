@@ -16,6 +16,27 @@ type EventBus struct {
 	subs map[string][]chan Event
 }
 
+func (b *EventBus) SubscribeWithCancel(typ string) (<-chan Event, func()) {
+	ch := make(chan Event, 64)
+	b.mu.Lock()
+	b.subs[typ] = append(b.subs[typ], ch)
+	b.mu.Unlock()
+	var once sync.Once
+	cancel := func() {
+		once.Do(func() {
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			for i, candidate := range b.subs[typ] {
+				if candidate == ch {
+					b.subs[typ] = append(b.subs[typ][:i], b.subs[typ][i+1:]...)
+					break
+				}
+			}
+		})
+	}
+	return ch, cancel
+}
+
 func NewEventBus() *EventBus {
 	return &EventBus{subs: map[string][]chan Event{}}
 }
@@ -30,8 +51,13 @@ func (b *EventBus) Subscribe(typ string) <-chan Event {
 
 func (b *EventBus) Publish(ev Event) {
 	b.mu.RLock()
-	defer b.mu.RUnlock()
-	for _, ch := range b.subs[ev.Type] {
-		ch <- ev
+	subs := append([]chan Event(nil), b.subs[ev.Type]...)
+	subs = append(subs, b.subs["*"]...)
+	b.mu.RUnlock()
+	for _, ch := range subs {
+		select {
+		case ch <- ev:
+		default:
+		}
 	}
 }

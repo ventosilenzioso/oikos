@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package observability;
+
+option go_package = "github.com/oikos/oikos/gen/go/observability";
+
+message HealthCheck { string name = 1; string status = 2; string error = 3; }
+message HealthStatus { string status = 1; repeated HealthCheck checks = 2; int64 timestamp_unix = 3; }
+message GetHealthStatusRequest {}
+message ServerMetric { string server_id = 1; string status = 2; double cpu_percent = 3; int64 memory_bytes = 4; }
+message GetServerMetricsRequest { string server_id = 1; }
+message GetServerMetricsResponse { repeated ServerMetric metrics = 1; }
+message EventRecord { string id = 1; string type = 2; string server_id = 3; string severity = 4; string message = 5; string metadata = 6; int64 created_at_unix = 7; }
+message StreamEventsRequest { string server_id = 1; string type = 2; int32 limit = 3; }
+
+service ObservabilityService {
+  rpc GetHealthStatus(GetHealthStatusRequest) returns (HealthStatus);
+  rpc GetServerMetrics(GetServerMetricsRequest) returns (GetServerMetricsResponse);
+  rpc StreamEvents(StreamEventsRequest) returns (stream EventRecord);
+}

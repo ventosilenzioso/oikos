@@ -6,19 +6,24 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	tunnelpb "github.com/oikos/oikos/gen/go/tunnel"
 	"github.com/oikos/oikos/internal/agent"
+	"github.com/oikos/oikos/internal/api"
 	"github.com/oikos/oikos/internal/config"
+	"github.com/oikos/oikos/internal/observability"
 	"github.com/oikos/oikos/internal/orchestrator"
 	"github.com/oikos/oikos/internal/runtime"
 	"github.com/oikos/oikos/internal/runtime/docker"
 	"github.com/oikos/oikos/internal/store"
 	"github.com/oikos/oikos/internal/tunnel"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func runDaemon(args []string) error {
@@ -74,13 +79,38 @@ func runDaemon(args []string) error {
 		portRoot = "eggs"
 	}
 	lc := orchestrator.NewWithTunnel(db, rt, bus, manager, orchestrator.EggPortProvider{Root: portRoot})
+	metrics := observability.NewMetrics(prometheus.NewRegistry(), observability.RuntimeSnapshotProvider{DB: db, Runtime: rt})
+	health := observability.NewHealthChecker(map[string]observability.Probe{
+		"sqlite": func(context.Context) error { return db.Ping() },
+		"docker": func(ctx context.Context) error { _, err := rt.Stats(ctx, "__health_probe__"); return err },
+		"panel":  func(context.Context) error { return nil },
+	})
+	obsServer := observability.NewHTTPServer(cfg.Observability, metrics.Handler(), observability.HealthHandler(health))
+	go func() {
+		if err := obsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		}
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = obsServer.Shutdown(shutdownCtx)
+	}()
+	if err := metrics.Refresh(ctx); err != nil {
+		_ = err
+	}
+	recorder := orchestrator.NewEventRecorder(bus, db)
+	recorderCtx, stopRecorder := context.WithCancel(ctx)
+	go recorder.Start(recorderCtx)
+	defer stopRecorder()
+	go (&observability.Scheduler{Metrics: metrics, Health: health, MetricsInterval: cfg.Observability.MetricsInterval.Duration(), HealthInterval: cfg.Observability.HealthInterval.Duration()}).Run(ctx)
 	return agent.Run(ctx, agent.DaemonArgs{
-		PanelAddr: cfg.Panel.Address,
-		CertPath:  node.CertPath,
-		KeyPath:   node.KeyPath,
-		CAPath:    cfg.Panel.CAPath,
-		NodeID:    node.ID,
-		LocalPort: cfg.API.LocalGRPCPort,
-		Tunnel:    manager,
+		PanelAddr:     cfg.Panel.Address,
+		CertPath:      node.CertPath,
+		KeyPath:       node.KeyPath,
+		CAPath:        cfg.Panel.CAPath,
+		NodeID:        node.ID,
+		LocalPort:     cfg.API.LocalGRPCPort,
+		Tunnel:        manager,
+		Observability: api.NewObservabilityService(health, metrics, db),
 	}, lc)
 }

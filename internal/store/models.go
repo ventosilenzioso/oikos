@@ -10,6 +10,8 @@ type Server struct {
 	Status         string
 	StartupCommand string
 	Environment    string
+	RestartCount   int
+	LastCrashAt    time.Time
 }
 
 type Egg struct {

@@ -14,13 +14,14 @@ import (
 
 // DaemonArgs adalah parameter loop daemon.
 type DaemonArgs struct {
-	PanelAddr string
-	CertPath  string
-	KeyPath   string
-	CAPath    string
-	NodeID    string
-	LocalPort int
-	Tunnel    tunnel.Manager
+	PanelAddr     string
+	CertPath      string
+	KeyPath       string
+	CAPath        string
+	NodeID        string
+	LocalPort     int
+	Tunnel        tunnel.Manager
+	Observability *api.ObservabilityService
 }
 
 // Run menjalankan loop daemon: serve API lokal, dial Panel, heartbeat +
@@ -30,7 +31,7 @@ func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error
 	if err != nil {
 		return fmt.Errorf("listen api lokal: %w", err)
 	}
-	apiSrv := api.NewServer(lc)
+	apiSrv := api.NewServerWithObservability(lc, args.Observability)
 	go func() { _ = apiSrv.Serve(lis) }()
 	defer apiSrv.GracefulStop()
 	if args.Tunnel != nil {

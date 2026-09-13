@@ -14,6 +14,9 @@ func TestEventHistoryQueryAndPrune(t *testing.T) {
 	if err := db.MigrateObservability(); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.MigrateObservability(); err != nil {
+		t.Fatal("migration kedua harus idempoten: ", err)
+	}
 	if err := db.CreateEgg(Egg{ID: "egg-events", Name: "events", DockerfilePath: "d", MetadataPath: "m"}); err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -25,6 +26,8 @@ func Open(path string) (*DB, error) {
 }
 
 func (d *DB) Close() error { return d.sql.Close() }
+
+func (d *DB) Ping() error { return d.sql.Ping() }
 
 // migrationCandidates dicoba berurutan: binary dijalankan dari repo root,
 // atau go test yang workdir-nya direktori package ini.
@@ -58,7 +61,7 @@ func (d *DB) Migrate() error {
 	if _, err := d.sql.Exec(string(data)); err != nil {
 		return fmt.Errorf("aplikasi migrasi: %w", err)
 	}
-	return nil
+	return d.MigrateObservability()
 }
 
 func (d *DB) MigrateNetworking() error {
@@ -91,10 +94,36 @@ func (d *DB) MigrateObservability() error {
 	if err != nil {
 		return fmt.Errorf("baca migrasi observability: %w", err)
 	}
-	if _, err := d.sql.Exec(string(data)); err != nil {
+	sqlText := string(data)
+	alterAt := strings.Index(sqlText, "ALTER TABLE servers")
+	if alterAt < 0 {
+		alterAt = len(sqlText)
+	}
+	if _, err := d.sql.Exec(sqlText[:alterAt]); err != nil {
 		return fmt.Errorf("aplikasi migrasi observability: %w", err)
 	}
+	for _, column := range []string{"restart_count INTEGER NOT NULL DEFAULT 0", "last_crash_at DATETIME"} {
+		name := strings.SplitN(column, " ", 2)[0]
+		var exists int
+		if err := d.sql.QueryRow(`SELECT count(*) FROM pragma_table_info('servers') WHERE name=?`, name).Scan(&exists); err != nil {
+			return err
+		}
+		if exists == 0 {
+			if _, err := d.sql.Exec(`ALTER TABLE servers ADD COLUMN ` + column); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
+}
+
+func (d *DB) IncrementRestartCount(id string) error {
+	_, err := d.sql.Exec(`UPDATE servers SET restart_count=restart_count+1 WHERE id=?`, id)
+	return err
+}
+func (d *DB) ResetRestartCount(id string) error {
+	_, err := d.sql.Exec(`UPDATE servers SET restart_count=0 WHERE id=?`, id)
+	return err
 }
 
 func (d *DB) CreateEgg(e Egg) error {
@@ -119,12 +148,19 @@ func (d *DB) CreateServer(s Server) error {
 func (d *DB) GetServer(id string) (Server, error) {
 	var s Server
 	var cid sql.NullString
-	err := d.sql.QueryRow(`SELECT id,name,egg_id,container_id,status,startup_command,environment FROM servers WHERE id=?`, id).
-		Scan(&s.ID, &s.Name, &s.EggID, &cid, &s.Status, &s.StartupCommand, &s.Environment)
+	var lastCrash sql.NullString
+	err := d.sql.QueryRow(`SELECT id,name,egg_id,container_id,status,startup_command,environment,restart_count,last_crash_at FROM servers WHERE id=?`, id).
+		Scan(&s.ID, &s.Name, &s.EggID, &cid, &s.Status, &s.StartupCommand, &s.Environment, &s.RestartCount, &lastCrash)
 	if err != nil {
 		return Server{}, err
 	}
 	s.ContainerID = cid.String
+	if lastCrash.Valid {
+		s.LastCrashAt, err = time.Parse(time.RFC3339, lastCrash.String)
+		if err != nil {
+			return Server{}, err
+		}
+	}
 	return s, nil
 }
 
@@ -144,7 +180,7 @@ func (d *DB) DeleteServer(id string) error {
 }
 
 func (d *DB) ListServers() ([]Server, error) {
-	rows, err := d.sql.Query(`SELECT id,name,egg_id,container_id,status,startup_command,environment FROM servers ORDER BY created_at`)
+	rows, err := d.sql.Query(`SELECT id,name,egg_id,container_id,status,startup_command,environment,restart_count,last_crash_at FROM servers ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -152,11 +188,17 @@ func (d *DB) ListServers() ([]Server, error) {
 	var out []Server
 	for rows.Next() {
 		var s Server
-		var cid sql.NullString
-		if err := rows.Scan(&s.ID, &s.Name, &s.EggID, &cid, &s.Status, &s.StartupCommand, &s.Environment); err != nil {
+		var cid, lastCrash sql.NullString
+		if err := rows.Scan(&s.ID, &s.Name, &s.EggID, &cid, &s.Status, &s.StartupCommand, &s.Environment, &s.RestartCount, &lastCrash); err != nil {
 			return nil, err
 		}
 		s.ContainerID = cid.String
+		if lastCrash.Valid {
+			s.LastCrashAt, err = time.Parse(time.RFC3339, lastCrash.String)
+			if err != nil {
+				return nil, err
+			}
+		}
 		out = append(out, s)
 	}
 	return out, rows.Err()

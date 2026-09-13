@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	obspb "github.com/oikos/oikos/gen/go/observability"
 	serverpb "github.com/oikos/oikos/gen/go/server"
 	"github.com/oikos/oikos/internal/orchestrator"
 	"github.com/oikos/oikos/internal/store"
@@ -21,6 +22,14 @@ type Server struct {
 func NewServer(lc *orchestrator.Lifecycle) *grpc.Server {
 	srv := grpc.NewServer()
 	serverpb.RegisterServerServiceServer(srv, &Server{lc: lc})
+	return srv
+}
+
+func NewServerWithObservability(lc *orchestrator.Lifecycle, obs *ObservabilityService) *grpc.Server {
+	srv := NewServer(lc)
+	if obs != nil {
+		obspb.RegisterObservabilityServiceServer(srv, obs)
+	}
 	return srv
 }
 
