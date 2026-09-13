@@ -96,6 +96,25 @@ func (d *DB) DeleteServer(id string) error {
 	return err
 }
 
+func (d *DB) ListServers() ([]Server, error) {
+	rows, err := d.sql.Query(`SELECT id,name,egg_id,container_id,status,startup_command,environment FROM servers ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Server
+	for rows.Next() {
+		var s Server
+		var cid sql.NullString
+		if err := rows.Scan(&s.ID, &s.Name, &s.EggID, &cid, &s.Status, &s.StartupCommand, &s.Environment); err != nil {
+			return nil, err
+		}
+		s.ContainerID = cid.String
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 func (d *DB) SaveNode(n Node) error {
 	_, err := d.sql.Exec(`INSERT OR REPLACE INTO nodes(id,name,panel_url,cert_path,key_path,paired_at) VALUES(?,?,?,?,?,?)`,
 		n.ID, n.Name, n.PanelURL, n.CertPath, n.KeyPath, n.PairedAt.UTC().Format(time.RFC3339))
