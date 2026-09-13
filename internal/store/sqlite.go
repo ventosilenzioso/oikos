@@ -32,6 +32,11 @@ var migrationCandidates = []string{
 	"../../migrations/0001_init.sql",
 }
 
+var networkingMigrationCandidates = []string{
+	"migrations/0002_networking.sql",
+	"../../migrations/0002_networking.sql",
+}
+
 func (d *DB) Migrate() error {
 	var data []byte
 	var err error
@@ -46,6 +51,24 @@ func (d *DB) Migrate() error {
 	}
 	if _, err := d.sql.Exec(string(data)); err != nil {
 		return fmt.Errorf("aplikasi migrasi: %w", err)
+	}
+	return nil
+}
+
+func (d *DB) MigrateNetworking() error {
+	var data []byte
+	var err error
+	for _, p := range networkingMigrationCandidates {
+		data, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("baca migrasi networking: %w", err)
+	}
+	if _, err := d.sql.Exec(string(data)); err != nil {
+		return fmt.Errorf("aplikasi migrasi networking: %w", err)
 	}
 	return nil
 }
@@ -134,6 +157,82 @@ func (d *DB) GetNode() (Node, error) {
 		return Node{}, fmt.Errorf("parse paired_at: %w", err)
 	}
 	return n, nil
+}
+
+func (d *DB) SaveTunnel(t Tunnel) error {
+	_, err := d.sql.Exec(`INSERT INTO tunnels(id,server_id,local_port,remote_port,protocol,status,last_connected) VALUES(?,?,?,?,?,?,NULLIF(?,''))
+		ON CONFLICT(server_id,local_port,protocol) DO UPDATE SET id=excluded.id, remote_port=excluded.remote_port, status=excluded.status`,
+		t.ID, t.ServerID, t.LocalPort, nullableInt(t.RemotePort), t.Protocol, t.Status, formatTime(t.LastConnected))
+	return err
+}
+
+func (d *DB) GetTunnelByMapping(serverID string, localPort int, protocol string) (Tunnel, error) {
+	var t Tunnel
+	var remote sql.NullInt64
+	var last sql.NullString
+	err := d.sql.QueryRow(`SELECT id,server_id,local_port,remote_port,protocol,status,last_connected FROM tunnels WHERE server_id=? AND local_port=? AND protocol=?`, serverID, localPort, protocol).
+		Scan(&t.ID, &t.ServerID, &t.LocalPort, &remote, &t.Protocol, &t.Status, &last)
+	if err != nil {
+		return Tunnel{}, err
+	}
+	if remote.Valid {
+		t.RemotePort = int(remote.Int64)
+	}
+	if last.Valid {
+		t.LastConnected, err = time.Parse(time.RFC3339, last.String)
+	}
+	return t, err
+}
+
+func (d *DB) ListTunnels(serverID string) ([]Tunnel, error) {
+	rows, err := d.sql.Query(`SELECT id,server_id,local_port,remote_port,protocol,status,last_connected FROM tunnels WHERE server_id=? ORDER BY local_port`, serverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Tunnel
+	for rows.Next() {
+		var t Tunnel
+		var remote sql.NullInt64
+		var last sql.NullString
+		if err := rows.Scan(&t.ID, &t.ServerID, &t.LocalPort, &remote, &t.Protocol, &t.Status, &last); err != nil {
+			return nil, err
+		}
+		if remote.Valid {
+			t.RemotePort = int(remote.Int64)
+		}
+		if last.Valid {
+			t.LastConnected, err = time.Parse(time.RFC3339, last.String)
+			if err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) DeleteTunnelByMapping(serverID string, localPort int, protocol string) error {
+	_, err := d.sql.Exec(`DELETE FROM tunnels WHERE server_id=? AND local_port=? AND protocol=?`, serverID, localPort, protocol)
+	return err
+}
+
+func (d *DB) UpdateTunnelStatus(id, status string) error {
+	_, err := d.sql.Exec(`UPDATE tunnels SET status=?, last_connected=CASE WHEN ?='connected' THEN CURRENT_TIMESTAMP ELSE last_connected END WHERE id=?`, status, status, id)
+	return err
+}
+
+func nullableInt(n int) any {
+	if n == 0 {
+		return nil
+	}
+	return n
+}
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 func (d *DB) SetResourceLimits(l ResourceLimits) error {

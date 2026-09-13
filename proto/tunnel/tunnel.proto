@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package tunnel;
+
+option go_package = "github.com/oikos/oikos/gen/go/tunnel";
+
+import "google/protobuf/empty.proto";
+
+message RegisterTunnelRequest {
+  string node_id = 1;
+  string server_id = 2;
+  int32 local_port = 3;
+  string protocol = 4;
+}
+
+message RegisterTunnelResponse {
+  string tunnel_id = 1;
+  int32 remote_port = 2;
+  string status = 3;
+  string frps_addr = 4;
+  int32 frps_port = 5;
+}
+
+message ReleaseTunnelRequest {
+  string node_id = 1;
+  string server_id = 2;
+  int32 local_port = 3;
+  string protocol = 4;
+}
+
+message TunnelStatusRequest {
+  string node_id = 1;
+  string server_id = 2;
+}
+
+message TunnelStatusResponse {
+  repeated TunnelInfo tunnels = 1;
+}
+
+message TunnelInfo {
+  string tunnel_id = 1;
+  string server_id = 2;
+  int32 local_port = 3;
+  int32 remote_port = 4;
+  string protocol = 5;
+  string status = 6;
+}
+
+message NetworkGroupAssignment {
+  string group_id = 1;
+  string name = 2;
+  string relay_addr = 3;
+  int32 relay_port = 4;
+  string private_ip = 5;
+  repeated NetworkGroupMember members = 6;
+}
+
+message NetworkGroupMember {
+  string node_id = 1;
+  string private_ip = 2;
+}
+
+message ListNetworkGroupMembersRequest {
+  string node_id = 1;
+  string group_id = 2;
+}
+
+message ListNetworkGroupMembersResponse {
+  repeated NetworkGroupMember members = 1;
+}
+
+service TunnelService {
+  rpc RegisterTunnel(RegisterTunnelRequest) returns (RegisterTunnelResponse);
+  rpc ReleaseTunnel(ReleaseTunnelRequest) returns (google.protobuf.Empty);
+  rpc GetTunnelStatus(TunnelStatusRequest) returns (TunnelStatusResponse);
+  rpc AssignNetworkGroup(NetworkGroupAssignment) returns (google.protobuf.Empty);
+  rpc ListNetworkGroupMembers(ListNetworkGroupMembersRequest) returns (ListNetworkGroupMembersResponse);
+}

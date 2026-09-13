@@ -36,3 +36,24 @@ type Node struct {
 	KeyPath  string
 	PairedAt time.Time
 }
+
+type Tunnel struct {
+	ID            string
+	ServerID      string
+	LocalPort     int
+	RemotePort    int
+	Protocol      string
+	Status        string
+	LastConnected time.Time
+}
+
+type NetworkGroup struct {
+	ID   string
+	Name string
+}
+
+type NetworkGroupMember struct {
+	GroupID   string
+	NodeID    string
+	PrivateIP string
+}
