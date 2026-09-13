@@ -5,7 +5,7 @@ socket, dan koneksi outbound mTLS ke Panel. frp hanya diperlukan bila node
 berada di balik NAT.
 
 ```bash
-curl -fsSL https://install.oikos.io | sh
+curl -fsSL https://raw.githubusercontent.com/ventosilenzioso/oikos/main/installer.sh | sudo bash
 oikos install --token <one-time-token> --panel panel.example.com:9091
 systemctl enable --now oikos
 oikos doctor --config /etc/oikos/config.yaml

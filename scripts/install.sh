@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Installer zero-config Oikos (fondasi): deteksi OS, pasang binary,
-# buat systemd unit, lalu jalankan `oikos install`.
+# Zero-config installer: detect the OS, install the binary, create the systemd
+# unit, and run the initial pairing command.
 set -euo pipefail
 
-BIN_URL="${OIKOS_BIN_URL:-https://github.com/oikos/oikos/releases/latest/download/oikos-linux-amd64}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+REPOSITORY="${OIKOS_REPOSITORY:-ventosilenzioso/oikos}"
+BIN_URL="${OIKOS_BIN_URL:-https://github.com/${REPOSITORY}/releases/latest/download/oikos-linux-amd64}"
 INSTALL_BIN="${OIKOS_INSTALL_BIN:-/usr/local/bin/oikos}"
 CONFIG_DIR="${OIKOS_CONFIG_DIR:-/etc/oikos}"
 DATA_DIR="${OIKOS_DATA_DIR:-/var/lib/oikos}"
@@ -31,7 +33,7 @@ else
     echo "OIKOS_FRPC_URL dan OIKOS_FRPC_SHA256 wajib diisi, atau gunakan OIKOS_FRPC_SKIP=1 untuk development" >&2
     exit 1
   fi
-  OIKOS_FRPC_BIN="$FRPC_BIN" bash scripts/install-frpc.sh
+  OIKOS_FRPC_BIN="$FRPC_BIN" bash "$SCRIPT_DIR/install-frpc.sh"
 fi
 
 echo "[2/4] buat direktori config..."
@@ -40,7 +42,7 @@ chmod 0750 "$CONFIG_DIR" "$DATA_DIR"
 
 echo "[3/4] pasang systemd unit..."
 mkdir -p "$SYSTEMD_DIR"
-cp deploy/systemd/oikos.service "$SYSTEMD_DIR/oikos.service"
+cp "$SCRIPT_DIR/../deploy/systemd/oikos.service" "$SYSTEMD_DIR/oikos.service"
 if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
   SYSTEMD_OK=1
