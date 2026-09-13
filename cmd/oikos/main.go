@@ -160,6 +160,7 @@ func runInstall(args []string) error {
 	token := fs.String("token", "", "pairing token sekali pakai")
 	name := fs.String("name", "", "nama node (default hostname)")
 	caPath := fs.String("ca-path", "", "path CA cert (opsional, override default)")
+	dataDir := fs.String("data-dir", "", "path data node (opsional, override default)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -169,6 +170,9 @@ func runInstall(args []string) error {
 	}
 	if *caPath != "" {
 		cfg.Panel.CAPath = *caPath
+	}
+	if *dataDir != "" {
+		cfg.Node.DataDir = *dataDir
 	}
 	if *panel != "" {
 		nodeName := *name

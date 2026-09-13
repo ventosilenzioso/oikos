@@ -4,8 +4,10 @@
 set -euo pipefail
 
 BIN_URL="${OIKOS_BIN_URL:-https://github.com/oikos/oikos/releases/latest/download/oikos-linux-amd64}"
-INSTALL_BIN="/usr/local/bin/oikos"
-CONFIG_DIR="/etc/oikos"
+INSTALL_BIN="${OIKOS_INSTALL_BIN:-/usr/local/bin/oikos}"
+CONFIG_DIR="${OIKOS_CONFIG_DIR:-/etc/oikos}"
+DATA_DIR="${OIKOS_DATA_DIR:-/var/lib/oikos}"
+SYSTEMD_DIR="${OIKOS_SYSTEMD_DIR:-/etc/systemd/system}"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "oikos install.sh hanya mendukung Linux" >&2
@@ -22,12 +24,19 @@ curl -fsSL -o "$INSTALL_BIN" "$BIN_URL"
 chmod 0755 "$INSTALL_BIN"
 
 echo "[2/4] buat direktori config..."
-mkdir -p "$CONFIG_DIR/certs" /var/lib/oikos
-chmod 0750 "$CONFIG_DIR" /var/lib/oikos
+mkdir -p "$CONFIG_DIR/certs" "$DATA_DIR"
+chmod 0750 "$CONFIG_DIR" "$DATA_DIR"
 
 echo "[3/4] pasang systemd unit..."
-cp deploy/systemd/oikos.service /etc/systemd/system/oikos.service
-systemctl daemon-reload
+mkdir -p "$SYSTEMD_DIR"
+cp deploy/systemd/oikos.service "$SYSTEMD_DIR/oikos.service"
+if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+  systemctl daemon-reload
+  SYSTEMD_OK=1
+else
+  echo "systemd tidak tersedia, lewati daemon-reload/enable (jalankan binary langsung)"
+  SYSTEMD_OK=0
+fi
 
 echo "[4/4] pairing awal..."
 if [[ -z "${OIKOS_TOKEN:-}" ]]; then
@@ -37,4 +46,8 @@ if [[ -z "${OIKOS_TOKEN:-}" ]]; then
 fi
 "$INSTALL_BIN" install --token "$OIKOS_TOKEN" --config "$CONFIG_DIR/config.yaml"
 
-echo "selesai. aktifkan daemon: systemctl enable --now oikos"
+if [[ "$SYSTEMD_OK" == "1" ]]; then
+  echo "selesai. aktifkan daemon: systemctl enable --now oikos"
+else
+  echo "selesai. jalankan daemon: $INSTALL_BIN daemon --config $CONFIG_DIR/config.yaml"
+fi
