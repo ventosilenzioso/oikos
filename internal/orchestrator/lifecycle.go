@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -16,11 +17,12 @@ import (
 
 // Lifecycle mengatur siklus hidup server: create/start/stop/restart/delete.
 type Lifecycle struct {
-	db      *store.DB
-	rt      runtime.Runtime
-	bus     *EventBus
-	tunnels tunnel.Manager
-	ports   PortProvider
+	db          *store.DB
+	rt          runtime.Runtime
+	bus         *EventBus
+	tunnels     tunnel.Manager
+	ports       PortProvider
+	manualStops sync.Map
 }
 
 func New(db *store.DB, rt runtime.Runtime, bus *EventBus) *Lifecycle {
@@ -80,6 +82,7 @@ func (l *Lifecycle) CreateServer(ctx context.Context, name, eggID, startup strin
 }
 
 func (l *Lifecycle) StartServer(ctx context.Context, id string) error {
+	l.manualStops.Delete(id)
 	s, err := getServer(l.db, id)
 	if err != nil {
 		return fmt.Errorf("ambil server: %w", err)
@@ -136,7 +139,9 @@ func (l *Lifecycle) StopServer(ctx context.Context, id string) error {
 		return fmt.Errorf("ambil server: %w", err)
 	}
 	if s.ContainerID != "" {
+		l.manualStops.Store(id, true)
 		if err := l.rt.Stop(ctx, s.ContainerID, 10); err != nil {
+			l.manualStops.Delete(id)
 			return fmt.Errorf("runtime stop: %w", err)
 		}
 	}
@@ -145,6 +150,11 @@ func (l *Lifecycle) StopServer(ctx context.Context, id string) error {
 	}
 	l.bus.Publish(Event{Type: "server.stopped", ServerID: id})
 	return nil
+}
+
+func (l *Lifecycle) IsManualStop(id string) bool {
+	_, ok := l.manualStops.LoadAndDelete(id)
+	return ok
 }
 
 func (l *Lifecycle) RestartServer(ctx context.Context, id string) error {

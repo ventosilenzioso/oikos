@@ -126,6 +126,11 @@ func (d *DB) ResetRestartCount(id string) error {
 	return err
 }
 
+func (d *DB) SetLastCrash(id string, at time.Time) error {
+	_, err := d.sql.Exec(`UPDATE servers SET last_crash_at=? WHERE id=?`, at.UTC().Format(time.RFC3339), id)
+	return err
+}
+
 func (d *DB) CreateEgg(e Egg) error {
 	_, err := d.sql.Exec(`INSERT INTO eggs(id,name,dockerfile_path,metadata_path) VALUES(?,?,?,?)`,
 		e.ID, e.Name, e.DockerfilePath, e.MetadataPath)
@@ -404,6 +409,25 @@ func (d *DB) ListEvents(f EventFilter) ([]Event, error) {
 			return nil, err
 		}
 		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+type MetricTunnel struct{ ServerID, Status string }
+
+func (d *DB) ListTunnelsForMetrics() ([]MetricTunnel, error) {
+	rows, err := d.sql.Query(`SELECT server_id,status FROM tunnels ORDER BY server_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MetricTunnel
+	for rows.Next() {
+		var t MetricTunnel
+		if err := rows.Scan(&t.ServerID, &t.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
 	}
 	return out, rows.Err()
 }

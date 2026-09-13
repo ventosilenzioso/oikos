@@ -29,5 +29,13 @@ func (p RuntimeSnapshotProvider) Snapshot(ctx context.Context) ([]ServerMetric, 
 		}
 		out = append(out, metric)
 	}
-	return out, nil, nil
+	tunnelRows, err := p.DB.ListTunnelsForMetrics()
+	if err != nil {
+		return nil, nil, err
+	}
+	tunnels := make([]TunnelMetric, 0, len(tunnelRows))
+	for _, row := range tunnelRows {
+		tunnels = append(tunnels, TunnelMetric{ServerID: row.ServerID, Status: row.Status})
+	}
+	return out, tunnels, nil
 }

@@ -43,3 +43,15 @@ func TestMetricsRefreshErrorKeepsHttpAlive(t *testing.T) {
 		t.Fatal(rec.Code)
 	}
 }
+
+func TestMetricsExposeTunnelStatus(t *testing.T) {
+	m := NewMetrics(prometheus.NewRegistry(), metricProvider{})
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/metrics", nil))
+	if !strings.Contains(rec.Body.String(), "oikos_tunnel_status") {
+		t.Fatal("tunnel metric missing")
+	}
+}
