@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -37,6 +38,11 @@ var networkingMigrationCandidates = []string{
 	"../../migrations/0002_networking.sql",
 }
 
+var observabilityMigrationCandidates = []string{
+	"migrations/0003_observability.sql",
+	"../../migrations/0003_observability.sql",
+}
+
 func (d *DB) Migrate() error {
 	var data []byte
 	var err error
@@ -69,6 +75,24 @@ func (d *DB) MigrateNetworking() error {
 	}
 	if _, err := d.sql.Exec(string(data)); err != nil {
 		return fmt.Errorf("aplikasi migrasi networking: %w", err)
+	}
+	return nil
+}
+
+func (d *DB) MigrateObservability() error {
+	var data []byte
+	var err error
+	for _, p := range observabilityMigrationCandidates {
+		data, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("baca migrasi observability: %w", err)
+	}
+	if _, err := d.sql.Exec(string(data)); err != nil {
+		return fmt.Errorf("aplikasi migrasi observability: %w", err)
 	}
 	return nil
 }
@@ -254,6 +278,96 @@ func (d *DB) ListNetworkGroupMembers(groupID string) ([]NetworkGroupMember, erro
 
 func (d *DB) DeleteNetworkGroupMember(groupID, nodeID string) error {
 	_, err := d.sql.Exec(`DELETE FROM network_group_members WHERE group_id=? AND node_id=?`, groupID, nodeID)
+	return err
+}
+
+type Event struct {
+	ID        string
+	Type      string
+	ServerID  string
+	Severity  string
+	Message   string
+	Metadata  string
+	CreatedAt time.Time
+}
+
+type EventFilter struct {
+	ServerID, Type string
+	From, To       time.Time
+	Limit          int
+}
+
+func (d *DB) SaveEvent(e Event) error {
+	if e.ID == "" || e.Type == "" || e.Message == "" {
+		return fmt.Errorf("event id, type, dan message wajib diisi")
+	}
+	if e.Severity == "" {
+		e.Severity = "info"
+	}
+	if e.Metadata == "" {
+		e.Metadata = "{}"
+	}
+	var valid int
+	if err := d.sql.QueryRow(`SELECT json_valid(?)`, e.Metadata).Scan(&valid); err != nil {
+		return err
+	}
+	if valid != 1 {
+		return fmt.Errorf("metadata event bukan JSON valid")
+	}
+	_, err := d.sql.Exec(`INSERT INTO events(id,type,server_id,severity,message,metadata,created_at) VALUES(?,?,?,?,?,?,?)`, e.ID, e.Type, nullIfEmpty(e.ServerID), e.Severity, e.Message, e.Metadata, e.CreatedAt.UTC().Format(time.RFC3339))
+	return err
+}
+
+func (d *DB) ListEvents(f EventFilter) ([]Event, error) {
+	query := `SELECT id,type,server_id,severity,message,metadata,created_at FROM events WHERE 1=1`
+	args := []any{}
+	if f.ServerID != "" {
+		query += ` AND server_id=?`
+		args = append(args, f.ServerID)
+	}
+	if f.Type != "" {
+		query += ` AND type=?`
+		args = append(args, f.Type)
+	}
+	if !f.From.IsZero() {
+		query += ` AND created_at>=?`
+		args = append(args, f.From.UTC().Format(time.RFC3339))
+	}
+	if !f.To.IsZero() {
+		query += ` AND created_at<=?`
+		args = append(args, f.To.UTC().Format(time.RFC3339))
+	}
+	query += ` ORDER BY created_at DESC`
+	if f.Limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, f.Limit)
+	} else {
+		query += ` LIMIT 1000`
+	}
+	rows, err := d.sql.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Event
+	for rows.Next() {
+		var e Event
+		var sid, created string
+		if err := rows.Scan(&e.ID, &e.Type, &sid, &e.Severity, &e.Message, &e.Metadata, &created); err != nil {
+			return nil, err
+		}
+		e.ServerID = sid
+		e.CreatedAt, err = time.Parse(time.RFC3339, created)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) PruneEvents(ctx context.Context, before time.Time) error {
+	_, err := d.sql.ExecContext(ctx, `DELETE FROM events WHERE created_at < ?`, before.UTC().Format(time.RFC3339))
 	return err
 }
 
