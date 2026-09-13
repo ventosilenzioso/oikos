@@ -150,12 +150,39 @@ func runInstall(args []string) error {
 	configPath := fs.String("config", "/etc/oikos/config.yaml", "path config yang ditulis")
 	panel := fs.String("panel", "", "alamat panel (opsional, override default)")
 	token := fs.String("token", "", "pairing token sekali pakai")
+	name := fs.String("name", "", "nama node (default hostname)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	cfg := config.Default()
 	if *panel != "" {
 		cfg.Panel.Address = *panel
+	}
+	if *panel != "" {
+		nodeName := *name
+		if nodeName == "" {
+			nodeName, _ = os.Hostname()
+			if nodeName == "" {
+				nodeName = "oikos-node"
+			}
+		}
+		if err := os.MkdirAll(cfg.Node.DataDir, 0750); err != nil {
+			return err
+		}
+		db, err := store.Open(filepath.Join(cfg.Node.DataDir, "oikos.db"))
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		if err := db.Migrate(); err != nil {
+			return err
+		}
+		id, err := agent.PairWithPanel(context.Background(), cfg.Panel.Address, *token, nodeName, cfg, db, *configPath, nil)
+		if err != nil {
+			return err
+		}
+		fmt.Println("pairing ok, node id", id)
+		return nil
 	}
 	if err := agent.PairWithToken(*token, cfg, *configPath); err != nil {
 		return err
