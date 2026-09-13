@@ -29,8 +29,8 @@ func (d *DB) Close() error { return d.sql.Close() }
 
 func (d *DB) Ping() error { return d.sql.Ping() }
 
-// migrationCandidates dicoba berurutan: binary dijalankan dari repo root,
-// atau go test yang workdir-nya direktori package ini.
+// migrationCandidates are tried in order: the binary may run from the repository
+// root, or go test may use the package directory as its working directory.
 var migrationCandidates = []string{
 	"migrations/0001_init.sql",
 	"../../migrations/0001_init.sql",
@@ -60,7 +60,7 @@ func (d *DB) Migrate() error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("baca migrasi (jalankan dari repo root): %w", err)
+		return fmt.Errorf("read migration (run from repository root): %w", err)
 	}
 	if _, err := d.sql.Exec(string(data)); err != nil {
 		return fmt.Errorf("aplikasi migrasi: %w", err)
@@ -281,7 +281,7 @@ func (d *DB) CreateEgg(e Egg) error {
 	return err
 }
 
-// EnsureEgg mendaftarkan egg bila belum ada (no-op bila sudah terdaftar).
+// EnsureEgg registers an egg if it does not exist; it is a no-op otherwise.
 func (d *DB) EnsureEgg(e Egg) error {
 	_, err := d.sql.Exec(`INSERT OR IGNORE INTO eggs(id,name,dockerfile_path,metadata_path) VALUES(?,?,?,?)`,
 		e.ID, e.Name, e.DockerfilePath, e.MetadataPath)

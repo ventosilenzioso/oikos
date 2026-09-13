@@ -25,8 +25,8 @@ type CredentialStore interface {
 	GetSFTPCredential(string) (store.SFTPCredential, error)
 }
 
-// SFTPServer menyediakan listener SSH terisolasi. File operations delegated ke
-// Manager; transport hanya menerima public key credential yang terdaftar.
+// SFTPServer provides an isolated SSH listener. File operations are delegated
+// to Manager; the transport accepts only registered public-key credentials.
 type SFTPServer struct {
 	cfg      config.SFTPConfig
 	manager  Manager

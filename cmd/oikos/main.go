@@ -85,7 +85,7 @@ func openLifecycleWith(engine string) (*orchestrator.Lifecycle, error) {
 			return nil, err
 		}
 	}
-	// db sengaja tidak di-Close: lifecycle memakainya selama proses berjalan.
+	// The database remains open because the lifecycle uses it while the process runs.
 	return orchestrator.New(db, rt, orchestrator.NewEventBus()), nil
 }
 

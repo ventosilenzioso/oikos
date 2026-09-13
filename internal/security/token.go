@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-// GenerateToken membuat token pairing sekali pakai (32 byte acak, hex).
+// GenerateToken creates a one-time pairing token from 32 random bytes encoded as hex.
 func GenerateToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

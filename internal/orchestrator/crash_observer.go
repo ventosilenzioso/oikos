@@ -7,8 +7,8 @@ import (
 	"github.com/oikos/oikos/internal/runtime"
 )
 
-// CrashObserver mendeteksi transition running -> crashed dari runtime.
-// Status stopped tidak dianggap crash, sehingga stop manual tidak memicu healer.
+// CrashObserver detects a running-to-stopped/crashed runtime transition.
+// Manual stops are tracked separately and do not trigger the healer.
 type CrashObserver struct {
 	db       *Lifecycle
 	runtime  runtime.Runtime

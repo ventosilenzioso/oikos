@@ -10,9 +10,9 @@ import (
 	"github.com/oikos/oikos/internal/orchestrator"
 )
 
-// RunCommandStream menerima command Panel dan meneruskannya ke orchestrator.
-// Command yang gagal diproses dilewati tanpa memutus stream; fungsi kembali
-// hanya saat stream berakhir atau ctx selesai.
+// RunCommandStream receives Panel commands and forwards them to the orchestrator.
+// Failed commands are skipped without closing the stream; the function returns
+// only when the stream ends or ctx is canceled.
 func RunCommandStream(ctx context.Context, client nodepb.NodeServiceClient, lc *orchestrator.Lifecycle) error {
 	stream, err := client.StreamCommands(ctx, &nodepb.StreamRequest{})
 	if err != nil {

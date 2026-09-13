@@ -9,9 +9,9 @@ import (
 	"github.com/oikos/oikos/internal/store"
 )
 
-// NewFromConfig membangun manager dengan process controller nyata. Panel
-// allocator dan event publisher di-inject oleh daemon agar boundary jaringan
-// dan event bus tetap dapat diuji terpisah.
+// NewFromConfig builds a manager with the real process controller. The daemon
+// injects the Panel allocator and event publisher so networking and event-bus
+// boundaries can be tested independently.
 func NewFromConfig(cfg config.RuntimeConfig, allocator PanelAllocator, st TunnelStore, publish func(string, string)) (Manager, error) {
 	if cfg.FRPBinary == "" {
 		return nil, fmt.Errorf("runtime.frp_binary wajib diisi")

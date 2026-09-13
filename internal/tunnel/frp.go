@@ -31,7 +31,7 @@ type FrpManager struct {
 	mappings  map[string]PortMapping
 }
 
-// eventBusAdapter menghindari import cycle dan meneruskan event ke bus Fase 1.
+// eventBusAdapter avoids an import cycle while forwarding events to the event bus.
 type eventBusAdapter struct{ publish func(string, string) }
 
 func NewFrpManager(cfg FRPConfig, allocator PanelAllocator, st TunnelStore, process ProcessController, publish func(string, string)) *FrpManager {
@@ -167,8 +167,8 @@ func (m *FrpManager) Close(ctx context.Context) error {
 	return m.process.Stop(ctx)
 }
 
-// Watch mengawasi child frpc dan mencoba reload kembali saat proses berhenti.
-// Retry policy detail dan alerting tetap menjadi tanggung jawab Fase 3.
+// Watch observes the frpc child and attempts a reload when it exits.
+// Detailed retry policy and alerting remain the responsibility of Fase 3.
 func (m *FrpManager) Watch(ctx context.Context) {
 	attempt := 0
 	for {

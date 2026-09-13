@@ -6,5 +6,5 @@ USER oikos
 
 COPY --chown=oikos:oikos server.jar ./server.jar
 
-# CMD tidak didefinisikan di sini — startup command diambil dari egg.yaml
-# agar tetap fleksibel untuk variable substitution ({{MIN_MEMORY}}, dst)
+# CMD is intentionally omitted; the startup command comes from egg.yaml
+# so variable substitution ({{MIN_MEMORY}}, etc.) remains flexible.

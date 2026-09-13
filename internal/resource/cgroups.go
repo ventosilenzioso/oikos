@@ -4,8 +4,8 @@ package resource
 
 import "os"
 
-// DetectCgroupVersion mendeteksi versi cgroup host: "v2" bila file
-// cgroup.controllers ada, selain itu "v1".
+// DetectCgroupVersion detects the host cgroup version: "v2" when
+// cgroup.controllers exists, and "v1" otherwise.
 func DetectCgroupVersion() string {
 	if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err == nil {
 		return "v2"

@@ -12,7 +12,7 @@ import (
 	"github.com/oikos/oikos/internal/security"
 )
 
-// ComputeBackoff mengembalikan 2^attempt detik, cap 30 detik.
+// ComputeBackoff returns 2^attempt seconds, capped at 30 seconds.
 func ComputeBackoff(attempt int) time.Duration {
 	d := time.Second << attempt
 	if d <= 0 || d > 30*time.Second {
@@ -21,7 +21,7 @@ func ComputeBackoff(attempt int) time.Duration {
 	return d
 }
 
-// DialPanel membuka koneksi gRPC mTLS ke Panel, menunggu READY dengan backoff.
+// DialPanel opens an mTLS gRPC connection to the Panel and waits for READY with backoff.
 func DialPanel(ctx context.Context, panelAddr, certPath, keyPath, caPath string) (*grpc.ClientConn, error) {
 	tlsCfg, err := security.LoadClientTLS(certPath, keyPath, caPath)
 	if err != nil {

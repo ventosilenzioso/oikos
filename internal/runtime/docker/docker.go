@@ -18,8 +18,8 @@ type dockerRuntime struct {
 	cli *client.Client
 }
 
-// New membuat Runtime berbasis Docker. host kosong berarti baca dari environment
-// (mis. DOCKER_HOST atau socket default).
+// New creates a Docker-backed Runtime. An empty host reads the environment,
+// such as DOCKER_HOST or the default socket.
 func New(host string) (runtime.Runtime, error) {
 	opts := []client.Opt{client.WithAPIVersionNegotiation()}
 	if host == "" {
@@ -141,8 +141,8 @@ func (d *dockerRuntime) Status(ctx context.Context, containerID string) (runtime
 	if info.State.Running {
 		return runtime.StatusRunning, nil
 	}
-	// 137 (SIGKILL) dan 143 (SIGTERM) adalah hasil normal dari Stop,
-	// bukan crash. OOMKilled dicek terpisah karena juga berkode 137.
+	// 137 (SIGKILL) and 143 (SIGTERM) are normal Stop results, not crashes.
+	// OOMKilled is checked separately because it also uses exit code 137.
 	if info.State.OOMKilled {
 		return runtime.StatusCrashed, nil
 	}

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// ApplyLimits menulis file limit cgroup v2 ke direktori cgroup yang sudah ada.
+// ApplyLimits writes cgroup v2 limits to an existing cgroup directory.
 func ApplyLimits(dir string, lim Limits) error {
 	if lim.CPUMillicores > 0 {
 		if err := writeCgroupFile(dir, "cpu.max", strconv.FormatInt(lim.CPUMillicores*100, 10)+" 100000"); err != nil {
@@ -30,7 +30,7 @@ func ApplyLimits(dir string, lim Limits) error {
 	return nil
 }
 
-// ReadLimits membaca kembali limit dari direktori cgroup ("max" dibaca sebagai 0).
+// ReadLimits reads limits from a cgroup directory; "max" is returned as 0.
 func ReadLimits(dir string) (Limits, error) {
 	var lim Limits
 	cpu, err := readCgroupFile(dir, "cpu.max")

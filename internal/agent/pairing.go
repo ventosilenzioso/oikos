@@ -19,9 +19,9 @@ import (
 	"github.com/oikos/oikos/internal/store"
 )
 
-// PairWithToken menjalankan pairing tahap fondasi: validasi token sekali pakai,
-// buat data dir, dan tulis config.yaml awal.
-// Pertukaran CSR/cert mTLS penuh (PairingRequest/Response) menyusul tahap lanjutan.
+// PairWithToken performs the initial pairing step: validates the one-time token,
+// creates the data directory, and writes the initial config.yaml.
+// Full CSR/certificate mTLS exchange is handled by PairWithPanel.
 func PairWithToken(token string, cfg *config.Config, configPath string) error {
 	if err := security.ValidateFormat(token); err != nil {
 		return fmt.Errorf("token pairing: %w", err)
@@ -35,10 +35,10 @@ func PairWithToken(token string, cfg *config.Config, configPath string) error {
 	return writeConfig(cfg, configPath)
 }
 
-// PairWithPanel menjalankan pairing penuh: generate key + CSR, tukar ke Panel,
-// simpan key/cert 0600, catat node di SQLite, tulis config.
-// Bila client nil, koneksi plaintext dibuat ke panelAddr (jalur produksi/CLI);
-// test menginject client bufconn.
+// PairWithPanel performs full pairing: generates a key and CSR, exchanges it
+// with the Panel, saves key/certificate files with mode 0600, records the node
+// in SQLite, and writes the config. A nil client dials panelAddr over plaintext
+// for production/CLI use; tests inject a bufconn client.
 func PairWithPanel(ctx context.Context, panelAddr, token, nodeName string, cfg *config.Config, db *store.DB, configPath string, client nodepb.NodeServiceClient) (string, error) {
 	if err := security.ValidateFormat(token); err != nil {
 		return "", fmt.Errorf("token pairing: %w", err)

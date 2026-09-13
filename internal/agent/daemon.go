@@ -13,7 +13,7 @@ import (
 	"github.com/oikos/oikos/internal/tunnel"
 )
 
-// DaemonArgs adalah parameter loop daemon.
+// DaemonArgs contains daemon loop parameters.
 type DaemonArgs struct {
 	PanelAddr     string
 	CertPath      string
@@ -33,8 +33,8 @@ func (a DaemonArgs) TriggerHandoff() {
 	}
 }
 
-// Run menjalankan loop daemon: serve API lokal, dial Panel, heartbeat +
-// command stream, reconnect dengan backoff. Kembali hanya saat ctx selesai.
+// Run serves the local API, dials the Panel, runs heartbeat and command
+// streams, and reconnects with backoff. It returns only when ctx is canceled.
 func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error {
 	var handoff sync.Once
 	triggerHandoff := func() { handoff.Do(args.TriggerHandoff) }

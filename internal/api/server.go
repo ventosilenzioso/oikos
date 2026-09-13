@@ -1,5 +1,5 @@
-// Package api menyediakan gRPC server lokal untuk debugging/CLI
-// sebelum Panel terhubung (plaintext, bind localhost saja).
+// Package api provides the local gRPC server for CLI and debugging before the
+// Panel connection is established. It binds to localhost in plaintext.
 package api
 
 import (
@@ -19,7 +19,7 @@ type Server struct {
 	lc *orchestrator.Lifecycle
 }
 
-// NewServer membangun gRPC server lokal di atas orchestrator.
+// NewServer builds the local gRPC server on top of the orchestrator.
 func NewServer(lc *orchestrator.Lifecycle) *grpc.Server {
 	srv := grpc.NewServer()
 	serverpb.RegisterServerServiceServer(srv, &Server{lc: lc})
@@ -65,7 +65,7 @@ func (s *Server) Start(ctx context.Context, req *serverpb.StartServerRequest) (*
 }
 
 func (s *Server) Stop(ctx context.Context, req *serverpb.StopServerRequest) (*serverpb.ServerOpResponse, error) {
-	// timeout_sec diabaikan di fondasi (lifecycle memakai 10 detik).
+	// timeout_sec is not yet forwarded; the lifecycle uses a 10-second timeout.
 	if err := s.lc.StopServer(ctx, req.ServerId); err != nil {
 		return nil, err
 	}

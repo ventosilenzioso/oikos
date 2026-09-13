@@ -15,7 +15,7 @@ import (
 	"github.com/oikos/oikos/internal/tunnel"
 )
 
-// Lifecycle mengatur siklus hidup server: create/start/stop/restart/delete.
+// Lifecycle manages the server lifecycle: create, start, stop, restart, and delete.
 type Lifecycle struct {
 	db          *store.DB
 	rt          runtime.Runtime
@@ -29,8 +29,8 @@ func New(db *store.DB, rt runtime.Runtime, bus *EventBus) *Lifecycle {
 	return NewWithTunnel(db, rt, bus, nil, nil)
 }
 
-// PortProvider memasok port yang didefinisikan egg. Lifecycle tidak membaca
-// port dari environment server agar kontrak tunnel tetap eksplisit.
+// PortProvider supplies ports defined by an egg. Lifecycle does not infer ports
+// from the server environment, keeping the tunnel contract explicit.
 type PortProvider interface {
 	Ports(context.Context, string) ([]tunnel.PortMapping, error)
 }
@@ -175,12 +175,12 @@ func (l *Lifecycle) RestartServer(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetServer membaca satu server dari store.
+// GetServer reads one server from the store.
 func (l *Lifecycle) GetServer(id string) (store.Server, error) {
 	return getServer(l.db, id)
 }
 
-// ListServers membaca semua server dari store.
+// ListServers reads all servers from the store.
 func (l *Lifecycle) ListServers() ([]store.Server, error) {
 	return l.db.ListServers()
 }

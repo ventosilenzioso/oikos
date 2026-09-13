@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// GenerateKey membuat private key ED25519 baru.
+// GenerateKey creates a new ED25519 private key.
 func GenerateKey() (ed25519.PrivateKey, error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -30,7 +30,7 @@ func MarshalKeyPEM(priv ed25519.PrivateKey) ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), nil
 }
 
-// GenerateCSR membuat certificate signing request untuk node.
+// GenerateCSR creates a certificate signing request for a node.
 func GenerateCSR(priv ed25519.PrivateKey, commonName string) ([]byte, error) {
 	der, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
 		Subject: pkix.Name{CommonName: commonName},
@@ -41,7 +41,7 @@ func GenerateCSR(priv ed25519.PrivateKey, commonName string) ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der}), nil
 }
 
-// GenerateCA membuat CA self-signed (untuk test dan tooling dev).
+// GenerateCA creates a self-signed CA for tests and development tooling.
 func GenerateCA(commonName string) (certPEM []byte, priv ed25519.PrivateKey, err error) {
 	priv, err = GenerateKey()
 	if err != nil {
@@ -63,7 +63,7 @@ func GenerateCA(commonName string) (certPEM []byte, priv ed25519.PrivateKey, err
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), priv, nil
 }
 
-// SaveKey menyimpan private key dengan permission 0600.
+// SaveKey stores a private key with mode 0600.
 func SaveKey(path string, priv ed25519.PrivateKey) error {
 	pemBytes, err := MarshalKeyPEM(priv)
 	if err != nil {
@@ -75,7 +75,7 @@ func SaveKey(path string, priv ed25519.PrivateKey) error {
 	return nil
 }
 
-// SaveCert menyimpan cert PEM dengan permission 0600.
+// SaveCert stores a PEM certificate with mode 0600.
 func SaveCert(path string, pemBytes []byte) error {
 	if err := os.WriteFile(path, pemBytes, 0600); err != nil {
 		return fmt.Errorf("tulis cert: %w", err)
@@ -83,7 +83,7 @@ func SaveCert(path string, pemBytes []byte) error {
 	return nil
 }
 
-// LoadClientTLS membangun tls.Config mTLS untuk koneksi node → Panel.
+// LoadClientTLS builds an mTLS tls.Config for node-to-Panel connections.
 func LoadClientTLS(certPath, keyPath, caPath string) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
@@ -104,7 +104,7 @@ func LoadClientTLS(certPath, keyPath, caPath string) (*tls.Config, error) {
 	}, nil
 }
 
-// LoadServerTLS membangun tls.Config untuk server yang mewajibkan client cert.
+// LoadServerTLS builds a tls.Config for a server requiring client certificates.
 func LoadServerTLS(certPath, keyPath, caPath string) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {

@@ -104,8 +104,8 @@ func (m *manager) Apply(release Release) error {
 	if err := m.config.saveState(newState); err != nil {
 		return err
 	}
-	// Setelah state manifest tersimpan, candidate menjadi slot historis yang
-	// sengaja dipertahankan untuk diagnosis dan rollback.
+	// Once the state manifest is saved, the candidate becomes a historical slot
+	// intentionally retained for diagnostics and rollback.
 	committed = true
 	if err := m.config.projectState(newState); err != nil {
 		return m.config.restoreState(state, fmt.Errorf("project slot state: %w", err))

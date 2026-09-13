@@ -59,8 +59,8 @@ func (m *Metrics) Refresh(ctx context.Context) error {
 
 func (m *Metrics) Handler() http.Handler { return m.SnapshotHandler() }
 
-// SnapshotHandler membangun collectors dari snapshot terakhir sehingga request
-// metrics tidak pernah memanggil provider/Docker secara langsung.
+// SnapshotHandler builds collectors from the latest snapshot so metrics
+// requests never call the provider or Docker directly.
 func (m *Metrics) SnapshotHandler() http.Handler {
 	reg := prometheus.NewRegistry()
 	m.mu.Lock()

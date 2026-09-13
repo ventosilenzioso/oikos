@@ -1,5 +1,5 @@
 // Package runtime mendefinisikan kontrak container engine (Docker, Podman, dll).
-// Semua operasi bersifat idempotent bila memungkinkan.
+// Operations are idempotent whenever the underlying runtime permits it.
 package runtime
 
 import "context"
@@ -13,7 +13,7 @@ type ContainerSpec struct {
 	MemoryLimit       int64 // bytes
 	PIDLimit          int64
 	WorkingDir        string
-	MountSource       string // path folder data server di host
+	MountSource       string // host path for the server data directory
 	SeccompProfile    string
 	AppArmorProfile   string
 	SELinuxLabel      string
@@ -37,7 +37,7 @@ type Stats struct {
 	NetTxBytes    int64
 }
 
-// Runtime adalah kontrak yang harus dipenuhi setiap implementasi container engine.
+// Runtime is the contract implemented by each container engine.
 type Runtime interface {
 	BuildImage(ctx context.Context, dockerfilePath, imageTag string) error
 	Create(ctx context.Context, spec ContainerSpec) (containerID string, err error)

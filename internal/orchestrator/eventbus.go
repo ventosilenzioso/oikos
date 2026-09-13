@@ -2,15 +2,14 @@ package orchestrator
 
 import "sync"
 
-// Event adalah pesan domain yang di-broadcast ke subscriber.
+// Event is a domain message broadcast to subscribers.
 type Event struct {
 	Type     string
 	ServerID string
 }
 
-// EventBus adalah pub/sub sederhana berbasis channel.
-// Channel subscriber berbuffer; Publish memblokir bila buffer penuh,
-// jadi subscriber wajib terus membaca atau berhenti subscribe.
+// EventBus is a simple channel-based pub/sub implementation.
+// Subscriber channels are buffered and slow consumers may drop events.
 type EventBus struct {
 	mu   sync.RWMutex
 	subs map[string][]chan Event
