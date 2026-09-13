@@ -78,6 +78,16 @@ func (d *DB) UpdateServerStatus(id, status string) error {
 	return err
 }
 
+func (d *DB) SetServerContainer(id, containerID string) error {
+	_, err := d.sql.Exec(`UPDATE servers SET container_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, containerID, id)
+	return err
+}
+
+func (d *DB) DeleteServer(id string) error {
+	_, err := d.sql.Exec(`DELETE FROM servers WHERE id=?`, id)
+	return err
+}
+
 func (d *DB) SetResourceLimits(l ResourceLimits) error {
 	_, err := d.sql.Exec(`INSERT INTO resource_limits(server_id,cpu_limit,memory_limit_mb,disk_limit_mb,pid_limit,bandwidth_kbps)
 		VALUES(?,?,?,?,?,?) ON CONFLICT(server_id) DO UPDATE SET cpu_limit=excluded.cpu_limit, memory_limit_mb=excluded.memory_limit_mb,
