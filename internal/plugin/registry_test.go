@@ -79,6 +79,24 @@ func TestRegistryDispatchesOnlySubscribedEventsAndStopsBridge(t *testing.T) {
 	}
 }
 
+func TestDummyPluginReceivesEventFromEventBusEndToEnd(t *testing.T) {
+	bus := orchestrator.NewEventBus()
+	dummy := &registryHost{manifest: Manifest{ID: "dummy", AllowedEvents: []string{"server.crashed"}}, status: HostStatus{Healthy: true, Running: true}}
+	registry := newTestRegistry(bus, dummy)
+	if err := registry.StartAll(); err != nil {
+		t.Fatal(err)
+	}
+	defer registry.StopAll()
+
+	bus.Publish(orchestrator.Event{Type: "server.crashed", ServerID: "server-1"})
+	waitForEvents(t, dummy, 1)
+	dummy.mu.Lock()
+	defer dummy.mu.Unlock()
+	if len(dummy.events) != 1 || dummy.events[0].Type != "server.crashed" || dummy.events[0].ServerID != "server-1" {
+		t.Fatalf("dummy plugin events=%+v", dummy.events)
+	}
+}
+
 func TestRegistryDisablesPluginAfterThreeDispatchFailures(t *testing.T) {
 	bus := orchestrator.NewEventBus()
 	host := &registryHost{manifest: Manifest{ID: "failing", AllowedEvents: []string{"server.crashed"}}, status: HostStatus{Healthy: true, Running: true}, err: errors.New("boom")}

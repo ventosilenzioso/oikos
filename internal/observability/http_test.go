@@ -31,3 +31,24 @@ func TestHTTPServerServesMetricsAndHealth(t *testing.T) {
 		t.Fatal(res.StatusCode)
 	}
 }
+
+func TestHTTPServerServesPluginNamespace(t *testing.T) {
+	cfg := config.Default().Observability
+	mux := http.NewServeMux()
+	mux.HandleFunc("/plugins/p/status", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	srv := NewHTTPServerWithPlugins(cfg, http.NotFoundHandler(), http.NotFoundHandler(), mux)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go srv.Serve(lis)
+	defer srv.Shutdown(context.Background())
+	res, err := http.Get("http://" + lis.Addr().String() + "/plugins/p/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatal(res.StatusCode)
+	}
+}

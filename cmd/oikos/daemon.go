@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/docker/client"
 	tunnelpb "github.com/oikos/oikos/gen/go/tunnel"
 	"github.com/oikos/oikos/internal/agent"
 	"github.com/oikos/oikos/internal/api"
@@ -20,6 +21,7 @@ import (
 	"github.com/oikos/oikos/internal/filesystem"
 	"github.com/oikos/oikos/internal/observability"
 	"github.com/oikos/oikos/internal/orchestrator"
+	"github.com/oikos/oikos/internal/plugin"
 	"github.com/oikos/oikos/internal/runtime"
 	"github.com/oikos/oikos/internal/runtime/docker"
 	"github.com/oikos/oikos/internal/store"
@@ -82,13 +84,32 @@ func runDaemon(args []string) error {
 	lc := orchestrator.NewWithTunnel(db, rt, bus, manager, orchestrator.EggPortProvider{Root: portRoot})
 	fileManager := filesystem.NewManager(cfg.Filesystem.ServerRoot)
 	fileService := api.NewFilesystemService(fileManager, cfg.Filesystem.MaxUploadBytes, int(cfg.Filesystem.UploadChunkBytes))
+	pluginRegistry := plugin.NewRegistry(db, bus, plugin.HostOptions{SocketRoot: filepath.Join(cfg.Node.DataDir, "plugins"), OikosVersion: "dev"})
+	if err := pluginRegistry.LoadEnabled(); err != nil {
+		return err
+	}
+	if err := pluginRegistry.StartAll(); err != nil {
+		return err
+	}
+	defer pluginRegistry.StopAll()
 	metrics := observability.NewMetrics(prometheus.NewRegistry(), observability.RuntimeSnapshotProvider{DB: db, Runtime: rt})
 	health := observability.NewHealthChecker(map[string]observability.Probe{
 		"sqlite": func(context.Context) error { return db.Ping() },
-		"docker": func(ctx context.Context) error { _, err := rt.Stats(ctx, "__health_probe__"); return err },
-		"panel":  func(context.Context) error { return nil },
+		"docker": func(ctx context.Context) error {
+			if cfg.Runtime.Engine == "fake" {
+				return nil
+			}
+			cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+			if err != nil {
+				return err
+			}
+			defer cli.Close()
+			_, err = cli.Ping(ctx)
+			return err
+		},
+		"panel": func(context.Context) error { return nil },
 	})
-	obsServer := observability.NewHTTPServer(cfg.Observability, metrics.Handler(), observability.HealthHandler(health))
+	obsServer := observability.NewHTTPServerWithPlugins(cfg.Observability, metrics.Handler(), observability.HealthHandler(health), pluginRegistry.Proxy().Handler())
 	go func() {
 		if err := obsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		}
