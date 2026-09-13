@@ -36,6 +36,22 @@ Implemented versioned update slots and release verification in `internal/update`
 - `gofmt -w internal/update/*.go` applied
 - `git diff --check` PASS
 
+## Latest Reviewer Follow-up
+
+- Reserved slot names `current`, `previous`, and `state.json` are rejected as release versions.
+- `Apply` rejects a release whose version equals the authoritative current or previous slot before candidate removal, preserving active and rollback binaries and projections.
+- Projection failure after manifest replacement now restores the prior authoritative manifest and repairs projections directly from that prior state before returning the error.
+- Added injected projection-failure coverage and active/previous/reserved-name regression coverage.
+- `state.json` remains authoritative; symlinks are compatibility projections and are repaired during projection-failure recovery.
+
+## Latest Verification
+
+- `go test ./internal/update/ -v` PASS
+- `go test ./...` PASS
+- `go vet ./...` PASS
+- `gofmt -w internal/update/*.go` applied
+- `git diff --check` PASS
+
 ## Concerns
 
 - The `HealthRunner` contract is intentionally narrow: it receives the candidate path before switching and the `current` symlink path after switching. Container lifecycle management remains outside this package, so updates never stop containers here.

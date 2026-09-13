@@ -166,7 +166,7 @@ func TestApplyRejectsUnsafeVersionWithoutDeletingExistingPath(t *testing.T) {
 	server := releaseServer(string(body))
 	defer server.Close()
 	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, nil)
-	for _, version := range []string{"", ".", "..", "../sentinel", "/tmp/evil", "nested/v2"} {
+	for _, version := range []string{"", ".", "..", "../sentinel", "/tmp/evil", "nested/v2", "current", "previous", "state.json"} {
 		t.Run(version, func(t *testing.T) {
 			err := mgr.Apply(Release{Version: version, BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
 			if err == nil {
@@ -176,6 +176,34 @@ func TestApplyRejectsUnsafeVersionWithoutDeletingExistingPath(t *testing.T) {
 	}
 	if got, err := os.ReadFile(sentinel); err != nil || string(got) != "do not delete" {
 		t.Fatalf("sentinel changed: %q, %v", got, err)
+	}
+}
+
+func TestApplyRejectsActiveAndPreviousVersionsWithoutChangingProjections(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	writeSlot(t, root, "v2", "previous-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	link(t, filepath.Join(root, "previous"), "v2")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	mgr := NewManager(SlotConfig{Root: root}, testVerifier{}, nil)
+	for _, version := range []string{"v1", "v2"} {
+		t.Run(version, func(t *testing.T) {
+			err := mgr.Apply(Release{Version: version, BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
+			if err == nil {
+				t.Fatal("Apply accepted an existing active or previous slot")
+			}
+			if got := linkTarget(t, filepath.Join(root, "current")); got != "v1" {
+				t.Fatalf("current target = %q, want v1", got)
+			}
+			if got := linkTarget(t, filepath.Join(root, "previous")); got != "v2" {
+				t.Fatalf("previous target = %q, want v2", got)
+			}
+			assertFile(t, filepath.Join(root, "v1"), "known-good")
+			assertFile(t, filepath.Join(root, "v2"), "previous-good")
+		})
 	}
 }
 
@@ -257,6 +285,40 @@ func TestStateManifestKeepsSlotsConsistentAcrossManagerInstances(t *testing.T) {
 	}
 }
 
+func TestApplyProjectionFailureRestoresPriorManifestAndProjections(t *testing.T) {
+	root := t.TempDir()
+	writeSlot(t, root, "v1", "known-good")
+	link(t, filepath.Join(root, "current"), "v1")
+	body := []byte("candidate")
+	server := releaseServer(string(body))
+	defer server.Close()
+	projectCalls := 0
+	mgr := NewManager(SlotConfig{Root: root, Project: func() error {
+		projectCalls++
+		return errors.New("projection failed")
+	}}, testVerifier{}, nil)
+	err := mgr.Apply(Release{Version: "v2", BinaryURL: server.URL, SHA256: checksum(body), Signature: []byte("signature")})
+	if err == nil {
+		t.Fatal("Apply succeeded despite projection failure")
+	}
+	if projectCalls != 1 {
+		t.Fatalf("projection calls = %d, want 1", projectCalls)
+	}
+	state, err := mgr.(*manager).config.loadState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Current != "v1" || state.Previous != "" {
+		t.Fatalf("state after projection failure = %+v, want current v1 and no previous", state)
+	}
+	if got := linkTarget(t, filepath.Join(root, "current")); got != "v1" {
+		t.Fatalf("current target = %q, want v1", got)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "previous")); !os.IsNotExist(err) {
+		t.Fatalf("previous projection after recovery: %v", err)
+	}
+}
+
 type recordingVerifier struct{ called bool }
 
 func (v *recordingVerifier) Verify(Release, []byte) error {
@@ -294,4 +356,15 @@ func linkTarget(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return target
+}
+
+func assertFile(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("%s = %q, want %q", path, got, want)
+	}
 }

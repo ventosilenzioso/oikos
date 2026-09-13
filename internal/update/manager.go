@@ -51,6 +51,9 @@ func (m *manager) Apply(release Release) error {
 	if err != nil {
 		return fmt.Errorf("read current slot: %w", err)
 	}
+	if release.Version == state.Current || release.Version == state.Previous {
+		return fmt.Errorf("release version %q is already an active or previous slot", release.Version)
+	}
 	if m.config.Backup != nil {
 		if err := m.config.Backup(); err != nil {
 			return fmt.Errorf("backup before update: %w", err)
@@ -92,6 +95,12 @@ func (m *manager) Apply(release Release) error {
 		return err
 	}
 	if err := m.config.projectState(newState); err != nil {
+		if restoreErr := m.config.saveState(state); restoreErr != nil {
+			return fmt.Errorf("project slot state: %w; restore manifest: %v", err, restoreErr)
+		}
+		if restoreErr := m.config.projectStateDirect(state); restoreErr != nil {
+			return fmt.Errorf("project slot state: %w; restore projections: %v", err, restoreErr)
+		}
 		return err
 	}
 	if m.health != nil {

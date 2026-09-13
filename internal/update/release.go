@@ -50,7 +50,7 @@ func verifyRelease(release Release, body []byte, verifier ReleaseVerifier) error
 }
 
 func validateVersion(version string) error {
-	if version == "" || version == "." || version == ".." || filepath.Base(version) != version || filepath.IsAbs(version) {
+	if version == "" || version == "." || version == ".." || version == "current" || version == "previous" || version == "state.json" || filepath.Base(version) != version || filepath.IsAbs(version) {
 		return fmt.Errorf("invalid release version %q", version)
 	}
 	return nil

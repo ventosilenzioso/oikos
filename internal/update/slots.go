@@ -9,8 +9,9 @@ import (
 )
 
 type SlotConfig struct {
-	Root   string
-	Backup func() error
+	Root    string
+	Backup  func() error
+	Project func() error
 }
 
 type slotState struct {
@@ -87,6 +88,13 @@ func (c SlotConfig) saveState(state slotState) error {
 }
 
 func (c SlotConfig) projectState(state slotState) error {
+	if c.Project != nil {
+		return c.Project()
+	}
+	return c.projectStateDirect(state)
+}
+
+func (c SlotConfig) projectStateDirect(state slotState) error {
 	if err := replaceSymlink(c.Root, "current", state.Current); err != nil {
 		return err
 	}
