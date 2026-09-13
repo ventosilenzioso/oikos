@@ -70,24 +70,7 @@ func newMockPanel(t *testing.T, tokens ...string) *mockPanel {
 	plain := grpc.NewServer()
 	nodepb.RegisterNodeServiceServer(plain, m)
 	srvCertPEM, srvKey := m.issue("panel.test")
-	keyPEM, err := security.MarshalKeyPEM(srvKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srvCert, err := tls.X509KeyPair(srvCertPEM, keyPEM)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caPEM) {
-		t.Fatal("parse CA gagal")
-	}
-	tlsSrv := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{srvCert},
-		ClientCAs:    pool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		MinVersion:   tls.VersionTLS12,
-	})))
+	tlsSrv := grpc.NewServer(grpc.Creds(mustServerTLS(t, srvCertPEM, srvKey, caPEM)))
 	nodepb.RegisterNodeServiceServer(tlsSrv, m)
 	go func() {
 		if err := plain.Serve(m.plainLis); err != nil {
@@ -101,6 +84,28 @@ func newMockPanel(t *testing.T, tokens ...string) *mockPanel {
 	}()
 	t.Cleanup(func() { plain.Stop(); tlsSrv.Stop() })
 	return m
+}
+
+func mustServerTLS(t *testing.T, certPEM []byte, key ed25519.PrivateKey, caPEM []byte) credentials.TransportCredentials {
+	t.Helper()
+	keyPEM, err := security.MarshalKeyPEM(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caPEM) {
+		t.Fatal("parse CA gagal")
+	}
+	return credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientCAs:    pool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		MinVersion:   tls.VersionTLS12,
+	})
 }
 
 // issue menerbitkan cert (client/server) yang di-sign CA mock.
