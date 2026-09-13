@@ -212,6 +212,51 @@ func (d *DB) ListTunnels(serverID string) ([]Tunnel, error) {
 	return out, rows.Err()
 }
 
+func (d *DB) SaveNetworkGroup(g NetworkGroup) error {
+	_, err := d.sql.Exec(`INSERT INTO network_groups(id,name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name`, g.ID, g.Name)
+	return err
+}
+
+func (d *DB) ReplaceNetworkGroupMembers(groupID string, members []NetworkGroupMember) error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM network_group_members WHERE group_id=?`, groupID); err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, member := range members {
+		if _, err := tx.Exec(`INSERT INTO network_group_members(group_id,node_id,private_ip) VALUES(?,?,?)`, groupID, member.NodeID, member.PrivateIP); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (d *DB) ListNetworkGroupMembers(groupID string) ([]NetworkGroupMember, error) {
+	rows, err := d.sql.Query(`SELECT group_id,node_id,private_ip FROM network_group_members WHERE group_id=? ORDER BY node_id`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []NetworkGroupMember
+	for rows.Next() {
+		var m NetworkGroupMember
+		if err := rows.Scan(&m.GroupID, &m.NodeID, &m.PrivateIP); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) DeleteNetworkGroupMember(groupID, nodeID string) error {
+	_, err := d.sql.Exec(`DELETE FROM network_group_members WHERE group_id=? AND node_id=?`, groupID, nodeID)
+	return err
+}
+
 func (d *DB) DeleteTunnelByMapping(serverID string, localPort int, protocol string) error {
 	_, err := d.sql.Exec(`DELETE FROM tunnels WHERE server_id=? AND local_port=? AND protocol=?`, serverID, localPort, protocol)
 	return err

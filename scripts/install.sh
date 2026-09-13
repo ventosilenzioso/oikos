@@ -8,6 +8,7 @@ INSTALL_BIN="${OIKOS_INSTALL_BIN:-/usr/local/bin/oikos}"
 CONFIG_DIR="${OIKOS_CONFIG_DIR:-/etc/oikos}"
 DATA_DIR="${OIKOS_DATA_DIR:-/var/lib/oikos}"
 SYSTEMD_DIR="${OIKOS_SYSTEMD_DIR:-/etc/systemd/system}"
+FRPC_BIN="${OIKOS_FRPC_BIN:-/usr/local/bin/frpc}"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "oikos install.sh hanya mendukung Linux" >&2
@@ -22,6 +23,16 @@ fi
 echo "[1/4] download binary oikos..."
 curl -fsSL -o "$INSTALL_BIN" "$BIN_URL"
 chmod 0755 "$INSTALL_BIN"
+
+if [[ "${OIKOS_FRPC_SKIP:-0}" == "1" ]]; then
+  echo "frpc download dilewati (OIKOS_FRPC_SKIP=1)"
+else
+  if [[ -z "${OIKOS_FRPC_URL:-}" || -z "${OIKOS_FRPC_SHA256:-}" ]]; then
+    echo "OIKOS_FRPC_URL dan OIKOS_FRPC_SHA256 wajib diisi, atau gunakan OIKOS_FRPC_SKIP=1 untuk development" >&2
+    exit 1
+  fi
+  OIKOS_FRPC_BIN="$FRPC_BIN" bash scripts/install-frpc.sh
+fi
 
 echo "[2/4] buat direktori config..."
 mkdir -p "$CONFIG_DIR/certs" "$DATA_DIR"
