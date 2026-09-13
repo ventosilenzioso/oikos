@@ -84,7 +84,10 @@ type Plugin struct {
 	Name             string
 	Version          string
 	BinaryPath       string
+	ConfigPath       string
+	SHA256           string
 	Enabled          bool
 	SubscribedEvents string
+	AllowedRoutes    string
 	InstalledAt      time.Time
 }

@@ -1,9 +1,11 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -14,7 +16,7 @@ import (
 type hostLifecycle interface {
 	Start() error
 	Stop() error
-	HandleEvent(Event) error
+	HandleEvent(context.Context, Event) error
 	HealthCheck() error
 	Routes() []string
 	Status() HostStatus
@@ -22,16 +24,34 @@ type hostLifecycle interface {
 
 type hostAdapter struct{ hostLifecycle }
 
+type concreteHostAdapter struct{ host *Host }
+
+func (h concreteHostAdapter) Start() error { return h.host.Start() }
+func (h concreteHostAdapter) Stop() error  { return h.host.Stop() }
+func (h concreteHostAdapter) HandleEvent(ctx context.Context, event Event) error {
+	return h.host.HandleEventContext(ctx, event)
+}
+func (h concreteHostAdapter) HealthCheck() error               { return h.host.HealthCheck() }
+func (h concreteHostAdapter) Routes() []string                 { return h.host.Routes() }
+func (h concreteHostAdapter) Status() HostStatus               { return h.host.Status() }
+func (h concreteHostAdapter) RouteHandler(string) http.Handler { return http.NotFoundHandler() }
+
+type routeProvider interface{ RouteHandler(string) http.Handler }
+
 type Registry struct {
-	db        *store.DB
-	bus       *orchestrator.EventBus
-	options   HostOptions
-	hosts     map[string]hostLifecycle
-	manifests map[string]Manifest
-	enabled   map[string]bool
-	failures  map[string]int
-	cancels   []func()
-	mu        sync.Mutex
+	db         *store.DB
+	bus        *orchestrator.EventBus
+	options    HostOptions
+	hosts      map[string]hostLifecycle
+	manifests  map[string]Manifest
+	enabled    map[string]bool
+	failures   map[string]int
+	cancels    []func()
+	bridgeWG   sync.WaitGroup
+	dispatchWG sync.WaitGroup
+	proxy      *Proxy
+	started    bool
+	mu         sync.Mutex
 }
 
 func NewRegistry(db *store.DB, bus *orchestrator.EventBus, options HostOptions) *Registry {
@@ -41,8 +61,10 @@ func NewRegistry(db *store.DB, bus *orchestrator.EventBus, options HostOptions) 
 	if options.EventTimeout <= 0 {
 		options.EventTimeout = 5 * time.Second
 	}
-	return &Registry{db: db, bus: bus, options: options, hosts: map[string]hostLifecycle{}, manifests: map[string]Manifest{}, enabled: map[string]bool{}, failures: map[string]int{}}
+	return &Registry{db: db, bus: bus, options: options, hosts: map[string]hostLifecycle{}, manifests: map[string]Manifest{}, enabled: map[string]bool{}, failures: map[string]int{}, proxy: NewProxy()}
 }
+
+func (r *Registry) Proxy() *Proxy { return r.proxy }
 
 func (r *Registry) LoadEnabled() error {
 	if r.db == nil {
@@ -62,18 +84,27 @@ func (r *Registry) LoadEnabled() error {
 		if err := json.Unmarshal([]byte(p.SubscribedEvents), &events); err != nil {
 			return fmt.Errorf("plugin %q subscribed events: %w", p.ID, err)
 		}
-		manifest := Manifest{ID: p.ID, Name: p.Name, Version: p.Version, Binary: p.BinaryPath, Enabled: true, AllowedEvents: events}
+		var routes []string
+		if err := json.Unmarshal([]byte(p.AllowedRoutes), &routes); err != nil {
+			return fmt.Errorf("plugin %q allowed routes: %w", p.ID, err)
+		}
+		manifest := Manifest{ID: p.ID, Name: p.Name, Version: p.Version, Binary: p.BinaryPath, Config: p.ConfigPath, SHA256: p.SHA256, Enabled: true, AllowedEvents: events, AllowedRoutes: routes}
 		host, err := NewHost(manifest, r.options)
 		if err != nil {
 			return err
 		}
-		r.hosts[p.ID], r.manifests[p.ID], r.enabled[p.ID] = host, manifest, true
+		r.hosts[p.ID], r.manifests[p.ID], r.enabled[p.ID] = concreteHostAdapter{host}, manifest, true
 	}
 	return nil
 }
 
 func (r *Registry) StartAll() error {
 	r.mu.Lock()
+	if r.started {
+		r.mu.Unlock()
+		return nil
+	}
+	r.started = true
 	hosts := make(map[string]hostLifecycle, len(r.hosts))
 	for id, host := range r.hosts {
 		if r.enabled[id] || !hasEnabledFlag(r.enabled, id) {
@@ -83,7 +114,20 @@ func (r *Registry) StartAll() error {
 	r.mu.Unlock()
 	for id, host := range hosts {
 		if err := host.Start(); err != nil {
+			r.mu.Lock()
+			r.started = false
+			r.mu.Unlock()
 			return fmt.Errorf("start plugin %q: %w", id, err)
+		}
+		if provider, ok := host.(routeProvider); ok {
+			for _, route := range r.manifests[id].AllowedRoutes {
+				if err := r.proxy.Register(id, route, provider.RouteHandler(route)); err != nil {
+					r.mu.Lock()
+					r.started = false
+					r.mu.Unlock()
+					return fmt.Errorf("register plugin %q route %q: %w", id, route, err)
+				}
+			}
 		}
 	}
 	r.bridge()
@@ -107,11 +151,19 @@ func (r *Registry) StopAll() error {
 	for _, cancel := range cancels {
 		cancel()
 	}
+	r.bridgeWG.Wait()
+	r.dispatchWG.Wait()
 	for _, host := range hosts {
 		if err := host.Stop(); err != nil {
+			r.mu.Lock()
+			r.started = false
+			r.mu.Unlock()
 			return err
 		}
 	}
+	r.mu.Lock()
+	r.started = false
+	r.mu.Unlock()
 	return nil
 }
 
@@ -125,7 +177,9 @@ func (r *Registry) bridge() {
 		for _, eventType := range manifest.AllowedEvents {
 			ch, done, cancel := r.bus.SubscribeWithCancelDone(eventType)
 			r.cancels = append(r.cancels, cancel)
+			r.bridgeWG.Add(1)
 			go func(id string, ch <-chan orchestrator.Event, done <-chan struct{}) {
+				defer r.bridgeWG.Done()
 				for {
 					select {
 					case <-done:
@@ -140,6 +194,8 @@ func (r *Registry) bridge() {
 }
 
 func (r *Registry) DispatchEvent(id string, event Event) error {
+	r.dispatchWG.Add(1)
+	defer r.dispatchWG.Done()
 	r.mu.Lock()
 	host, enabled := r.hosts[id], r.enabled[id]
 	if !hasEnabledFlag(r.enabled, id) {
@@ -149,14 +205,9 @@ func (r *Registry) DispatchEvent(id string, event Event) error {
 	if host == nil || !enabled {
 		return nil
 	}
-	result := make(chan error, 1)
-	go func() { result <- host.HandleEvent(event) }()
-	var err error
-	select {
-	case err = <-result:
-	case <-time.After(r.options.EventTimeout):
-		err = errors.New("plugin event timeout")
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), r.options.EventTimeout)
+	defer cancel()
+	err := host.HandleEvent(ctx, event)
 	if err == nil {
 		r.mu.Lock()
 		r.failures[id] = 0

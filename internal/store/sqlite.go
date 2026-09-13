@@ -89,6 +89,29 @@ func (d *DB) MigratePlugins() error {
 	if _, err := d.sql.Exec(string(data)); err != nil {
 		return fmt.Errorf("aplikasi migrasi plugin: %w", err)
 	}
+	columns := map[string]string{
+		"config_path":    `TEXT NOT NULL DEFAULT ''`,
+		"sha256":         `TEXT NOT NULL DEFAULT ''`,
+		"allowed_routes": `TEXT NOT NULL DEFAULT '[]'`,
+	}
+	for name, definition := range columns {
+		var found string
+		err := d.sql.QueryRow(`SELECT name FROM pragma_table_info('plugins') WHERE name=?`, name).Scan(&found)
+		if err == sql.ErrNoRows {
+			if _, err := d.sql.Exec(`ALTER TABLE plugins ADD COLUMN ` + name + ` ` + definition); err != nil {
+				return fmt.Errorf("add plugin column %s: %w", name, err)
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+	if _, err := d.sql.Exec(`UPDATE plugins SET allowed_routes='[]' WHERE allowed_routes IS NULL OR allowed_routes=''`); err != nil {
+		return err
+	}
+	// Legacy rows lack the checksum required to safely execute a plugin.
+	if _, err := d.sql.Exec(`UPDATE plugins SET enabled=0 WHERE enabled=1 AND (sha256='' OR binary_path='')`); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -181,6 +204,9 @@ func (d *DB) SavePlugin(p Plugin) error {
 	if p.SubscribedEvents == "" {
 		p.SubscribedEvents = "[]"
 	}
+	if p.AllowedRoutes == "" {
+		p.AllowedRoutes = "[]"
+	}
 	var valid int
 	if err := d.sql.QueryRow(`SELECT json_valid(?)`, p.SubscribedEvents).Scan(&valid); err != nil {
 		return err
@@ -188,11 +214,18 @@ func (d *DB) SavePlugin(p Plugin) error {
 	if valid != 1 {
 		return fmt.Errorf("subscribed events plugin bukan JSON valid")
 	}
-	_, err := d.sql.Exec(`INSERT INTO plugins(id,name,version,binary_path,enabled,subscribed_events,installed_at)
-		VALUES(?,?,?,?,?,?,?)
+	if err := d.sql.QueryRow(`SELECT json_valid(?)`, p.AllowedRoutes).Scan(&valid); err != nil {
+		return err
+	}
+	if valid != 1 {
+		return fmt.Errorf("allowed routes plugin bukan JSON valid")
+	}
+	_, err := d.sql.Exec(`INSERT INTO plugins(id,name,version,binary_path,config_path,sha256,enabled,subscribed_events,allowed_routes,installed_at)
+		VALUES(?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET name=excluded.name, version=excluded.version, binary_path=excluded.binary_path,
-			enabled=excluded.enabled, subscribed_events=excluded.subscribed_events, installed_at=excluded.installed_at`,
-		p.ID, p.Name, p.Version, p.BinaryPath, p.Enabled, p.SubscribedEvents, p.InstalledAt.UTC().Format(time.RFC3339))
+			config_path=excluded.config_path, sha256=excluded.sha256, enabled=excluded.enabled, subscribed_events=excluded.subscribed_events,
+			allowed_routes=excluded.allowed_routes, installed_at=excluded.installed_at`,
+		p.ID, p.Name, p.Version, p.BinaryPath, p.ConfigPath, p.SHA256, p.Enabled, p.SubscribedEvents, p.AllowedRoutes, p.InstalledAt.UTC().Format(time.RFC3339))
 	return err
 }
 
@@ -200,8 +233,8 @@ func (d *DB) GetPlugin(id string) (Plugin, error) {
 	var p Plugin
 	var installedAt string
 	var enabled int
-	err := d.sql.QueryRow(`SELECT id,name,version,binary_path,enabled,subscribed_events,installed_at FROM plugins WHERE id=?`, id).
-		Scan(&p.ID, &p.Name, &p.Version, &p.BinaryPath, &enabled, &p.SubscribedEvents, &installedAt)
+	err := d.sql.QueryRow(`SELECT id,name,version,binary_path,config_path,sha256,enabled,subscribed_events,allowed_routes,installed_at FROM plugins WHERE id=?`, id).
+		Scan(&p.ID, &p.Name, &p.Version, &p.BinaryPath, &p.ConfigPath, &p.SHA256, &enabled, &p.SubscribedEvents, &p.AllowedRoutes, &installedAt)
 	if err != nil {
 		return Plugin{}, err
 	}
@@ -214,7 +247,7 @@ func (d *DB) GetPlugin(id string) (Plugin, error) {
 }
 
 func (d *DB) ListPlugins() ([]Plugin, error) {
-	rows, err := d.sql.Query(`SELECT id,name,version,binary_path,enabled,subscribed_events,installed_at FROM plugins ORDER BY id`)
+	rows, err := d.sql.Query(`SELECT id,name,version,binary_path,config_path,sha256,enabled,subscribed_events,allowed_routes,installed_at FROM plugins ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +257,7 @@ func (d *DB) ListPlugins() ([]Plugin, error) {
 		var p Plugin
 		var installedAt string
 		var enabled int
-		if err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.BinaryPath, &enabled, &p.SubscribedEvents, &installedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.BinaryPath, &p.ConfigPath, &p.SHA256, &enabled, &p.SubscribedEvents, &p.AllowedRoutes, &installedAt); err != nil {
 			return nil, err
 		}
 		p.Enabled = enabled != 0

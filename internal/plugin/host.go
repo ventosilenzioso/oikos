@@ -192,6 +192,16 @@ func (h *Host) Stop() error {
 }
 
 func (h *Host) HandleEvent(event Event) error {
+	ctx, cancel := context.WithTimeout(context.Background(), h.options.EventTimeout)
+	defer cancel()
+	return h.handleEvent(ctx, event)
+}
+
+func (h *Host) HandleEventContext(ctx context.Context, event Event) error {
+	return h.handleEvent(ctx, event)
+}
+
+func (h *Host) handleEvent(ctx context.Context, event Event) error {
 	h.mu.RLock()
 	client, healthy, capability := h.client, h.status.Healthy, h.capability
 	h.mu.RUnlock()
@@ -201,8 +211,6 @@ func (h *Host) HandleEvent(event Event) error {
 	if !contains(capability.Events, event.Type) {
 		return fmt.Errorf("event %q is not supported by plugin", event.Type)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), h.options.EventTimeout)
-	defer cancel()
 	_, err := client.HandleEvent(ctx, &pluginpb.Event{Type: event.Type, ServerId: event.ServerID, Metadata: event.Metadata})
 	if err != nil {
 		h.markUnhealthy(err)

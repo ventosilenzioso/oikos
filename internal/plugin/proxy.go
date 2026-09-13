@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 )
 
-type Proxy struct{ routes map[string]http.Handler }
+type Proxy struct {
+	mu     sync.RWMutex
+	routes map[string]http.Handler
+}
 
 func NewProxy() *Proxy { return &Proxy{routes: map[string]http.Handler{}} }
 
@@ -18,6 +22,8 @@ func (p *Proxy) Register(pluginID, route string, handler http.Handler) error {
 	if handler == nil {
 		return fmt.Errorf("plugin route handler is nil")
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if _, exists := p.routes[route]; exists {
 		return fmt.Errorf("plugin route already registered: %s", route)
 	}
@@ -27,7 +33,10 @@ func (p *Proxy) Register(pluginID, route string, handler http.Handler) error {
 
 func (p *Proxy) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if handler, ok := p.routes[r.URL.Path]; ok {
+		p.mu.RLock()
+		handler, ok := p.routes[r.URL.Path]
+		p.mu.RUnlock()
+		if ok {
 			handler.ServeHTTP(w, r)
 			return
 		}
