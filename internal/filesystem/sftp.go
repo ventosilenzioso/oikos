@@ -35,6 +35,13 @@ type SFTPServer struct {
 	config   *ssh.ServerConfig
 }
 
+func (s *SFTPServer) Addr() net.Addr {
+	if s.listener == nil {
+		return nil
+	}
+	return s.listener.Addr()
+}
+
 func NewSFTPServer(cfg config.SFTPConfig, manager Manager, creds CredentialStore) (*SFTPServer, error) {
 	if manager == nil || creds == nil {
 		return nil, fmt.Errorf("manager dan credential store wajib")
