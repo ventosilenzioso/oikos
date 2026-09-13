@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,8 +42,8 @@ type Host struct {
 	capability Capability
 	status     HostStatus
 	mu         sync.RWMutex
-	stopOnce   sync.Once
 	waitDone   chan struct{}
+	listener   net.Listener
 }
 
 func NewHost(manifest Manifest, options HostOptions) (*Host, error) {
@@ -77,25 +78,49 @@ func (h *Host) Start() error {
 	}
 	h.socketPath = filepath.Join(h.options.SocketRoot, h.manifest.ID+".sock")
 	_ = os.Remove(h.socketPath)
+	listener, err := net.Listen("unix", h.socketPath)
+	if err != nil {
+		h.mu.Unlock()
+		return fmt.Errorf("create plugin socket: %w", err)
+	}
+	if err := os.Chmod(h.socketPath, 0o600); err != nil {
+		_ = listener.Close()
+		_ = os.Remove(h.socketPath)
+		h.mu.Unlock()
+		return fmt.Errorf("secure plugin socket: %w", err)
+	}
 	cmd := exec.Command(h.manifest.Binary)
-	cmd.Env = append(os.Environ(), "OIKOS_PLUGIN_SOCKET="+h.socketPath)
+	cmd.Env = []string{"OIKOS_PLUGIN_SOCKET_FD=3"}
+	for _, name := range []string{"OIKOS_FAKE_PLUGIN", "OIKOS_FAKE_PLUGIN_MODE", "OIKOS_FAKE_PLUGIN_CRASH", "OIKOS_FAKE_PLUGIN_SLOW"} {
+		if value, ok := os.LookupEnv(name); ok {
+			cmd.Env = append(cmd.Env, name+"="+value)
+		}
+	}
+	socketFile, err := listener.(*net.UnixListener).File()
+	if err != nil {
+		_ = listener.Close()
+		_ = os.Remove(h.socketPath)
+		h.mu.Unlock()
+		return fmt.Errorf("open plugin socket descriptor: %w", err)
+	}
+	cmd.ExtraFiles = []*os.File{socketFile}
 	h.cmd = cmd
 	h.waitDone = make(chan struct{})
+	h.listener = listener
 	if err := cmd.Start(); err != nil {
+		_ = listener.Close()
+		_ = os.Remove(h.socketPath)
 		h.mu.Unlock()
 		return fmt.Errorf("start plugin: %w", err)
 	}
 	h.status = HostStatus{Running: true, Healthy: false}
 	h.mu.Unlock()
 
-	go h.waitProcess(cmd)
+	waitDone := h.waitDone
+	go h.waitProcess(cmd, waitDone)
 	if err := waitForSocket(h.socketPath, time.Second); err != nil {
 		_ = h.Stop()
 		return err
-	}
-	if err := os.Chmod(h.socketPath, 0o600); err != nil {
-		_ = h.Stop()
-		return fmt.Errorf("secure plugin socket: %w", err)
 	}
 	conn, err := grpc.Dial("unix://"+h.socketPath, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithConnectParams(grpc.ConnectParams{MinConnectTimeout: time.Second}))
 	if err != nil {
@@ -103,6 +128,9 @@ func (h *Host) Start() error {
 		return fmt.Errorf("connect plugin: %w", err)
 	}
 	client := pluginpb.NewPluginServiceClient(conn)
+	h.mu.Lock()
+	h.conn, h.client = conn, client
+	h.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), h.options.HealthTimeout)
 	response, err := client.Init(ctx, &pluginpb.InitRequest{OikosVersion: h.options.OikosVersion, ConfigPath: h.manifest.Config, PluginId: h.manifest.ID})
 	cancel()
@@ -116,49 +144,50 @@ func (h *Host) Start() error {
 		}
 	}
 	if err != nil {
-		_ = conn.Close()
 		_ = h.Stop()
 		return fmt.Errorf("plugin handshake: %w", err)
 	}
 	h.mu.Lock()
-	h.conn, h.client, h.status.Healthy = conn, client, true
+	h.status.Healthy = true
 	h.mu.Unlock()
 	return nil
 }
 
 func (h *Host) Stop() error {
 	var result error
-	h.stopOnce.Do(func() {
-		h.mu.RLock()
-		client, conn, cmd, socket := h.client, h.conn, h.cmd, h.socketPath
-		h.mu.RUnlock()
-		if client != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			_, _ = client.Close(ctx, &emptypb.Empty{})
-			cancel()
-		}
-		if conn != nil {
-			_ = conn.Close()
-		}
-		if cmd != nil && cmd.Process != nil {
-			_ = cmd.Process.Kill()
-			if h.waitDone != nil {
-				select {
-				case <-h.waitDone:
-				case <-time.After(time.Second):
-				}
+	h.mu.RLock()
+	client, conn, cmd, socket, listener, waitDone := h.client, h.conn, h.cmd, h.socketPath, h.listener, h.waitDone
+	h.mu.RUnlock()
+	if client != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_, _ = client.Close(ctx, &emptypb.Empty{})
+		cancel()
+	}
+	if conn != nil {
+		_ = conn.Close()
+	}
+	if listener != nil {
+		_ = listener.Close()
+	}
+	if cmd != nil && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+		if waitDone != nil {
+			select {
+			case <-waitDone:
+			case <-time.After(time.Second):
 			}
 		}
-		if socket != "" {
-			result = os.Remove(socket)
-			if errors.Is(result, os.ErrNotExist) {
-				result = nil
-			}
+	}
+	if socket != "" {
+		result = os.Remove(socket)
+		if errors.Is(result, os.ErrNotExist) {
+			result = nil
 		}
-		h.mu.Lock()
-		h.status.Running, h.status.Healthy = false, false
-		h.mu.Unlock()
-	})
+	}
+	h.mu.Lock()
+	h.status.Running, h.status.Healthy = false, false
+	h.client, h.conn, h.cmd, h.listener, h.waitDone = nil, nil, nil, nil, nil
+	h.mu.Unlock()
 	return result
 }
 
@@ -218,11 +247,13 @@ func (h *Host) markUnhealthy(err error) {
 	h.mu.Unlock()
 }
 
-func (h *Host) waitProcess(cmd *exec.Cmd) {
+func (h *Host) waitProcess(cmd *exec.Cmd, waitDone chan struct{}) {
 	if err := cmd.Wait(); err != nil {
 		h.markUnhealthy(err)
+	} else {
+		h.markUnhealthy(errors.New("plugin exited"))
 	}
-	close(h.waitDone)
+	close(waitDone)
 	h.mu.Lock()
 	h.status.Running = false
 	h.mu.Unlock()
