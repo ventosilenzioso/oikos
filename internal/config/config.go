@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -38,12 +39,39 @@ type LogConfig struct {
 	Level string `yaml:"level"`
 }
 
+type Duration time.Duration
+
+func (d *Duration) UnmarshalYAML(unmarshal func(any) error) error {
+	var raw string
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	parsed, err := time.ParseDuration(raw)
+	if err != nil {
+		return err
+	}
+	*d = Duration(parsed)
+	return nil
+}
+
+func (d Duration) Duration() time.Duration { return time.Duration(d) }
+
+type ObservabilityConfig struct {
+	BindAddr           string   `yaml:"bind_addr"`
+	MetricsPath        string   `yaml:"metrics_path"`
+	HealthPath         string   `yaml:"health_path"`
+	EventRetentionDays int      `yaml:"event_retention_days"`
+	MetricsInterval    Duration `yaml:"metrics_interval"`
+	HealthInterval     Duration `yaml:"health_interval"`
+}
+
 type Config struct {
-	Node    NodeConfig    `yaml:"node"`
-	Panel   PanelConfig   `yaml:"panel"`
-	Runtime RuntimeConfig `yaml:"runtime"`
-	API     APIConfig     `yaml:"api"`
-	Log     LogConfig     `yaml:"log"`
+	Node          NodeConfig          `yaml:"node"`
+	Panel         PanelConfig         `yaml:"panel"`
+	Runtime       RuntimeConfig       `yaml:"runtime"`
+	API           APIConfig           `yaml:"api"`
+	Log           LogConfig           `yaml:"log"`
+	Observability ObservabilityConfig `yaml:"observability"`
 }
 
 func Load(path string) (*Config, error) {

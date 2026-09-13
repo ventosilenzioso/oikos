@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 func Default() *Config {
 	return &Config{
 		Node: NodeConfig{
@@ -15,5 +17,9 @@ func Default() *Config {
 		},
 		API: APIConfig{LocalGRPCPort: 9190},
 		Log: LogConfig{Level: "info"},
+		Observability: ObservabilityConfig{
+			BindAddr: "127.0.0.1:9191", MetricsPath: "/metrics", HealthPath: "/healthz",
+			EventRetentionDays: 30, MetricsInterval: Duration(15 * time.Second), HealthInterval: Duration(15 * time.Second),
+		},
 	}
 }

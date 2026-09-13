@@ -19,3 +19,10 @@ api:
   local_grpc_port: 9190
 log:
   level: "info"
+observability:
+  bind_addr: "127.0.0.1:9191"
+  metrics_path: "/metrics"
+  health_path: "/healthz"
+  event_retention_days: 30
+  metrics_interval: "15s"
+  health_interval: "15s"
