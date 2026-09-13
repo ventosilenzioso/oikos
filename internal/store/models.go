@@ -1,5 +1,7 @@
 package store
 
+import "time"
+
 type Server struct {
 	ID             string
 	Name           string
@@ -24,4 +26,13 @@ type ResourceLimits struct {
 	DiskLimitMB   int64
 	PIDLimit      int64
 	BandwidthKbps int64
+}
+
+type Node struct {
+	ID       string
+	Name     string
+	PanelURL string
+	CertPath string
+	KeyPath  string
+	PairedAt time.Time
 }

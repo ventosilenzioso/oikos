@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -93,6 +94,27 @@ func (d *DB) SetServerContainer(id, containerID string) error {
 func (d *DB) DeleteServer(id string) error {
 	_, err := d.sql.Exec(`DELETE FROM servers WHERE id=?`, id)
 	return err
+}
+
+func (d *DB) SaveNode(n Node) error {
+	_, err := d.sql.Exec(`INSERT OR REPLACE INTO nodes(id,name,panel_url,cert_path,key_path,paired_at) VALUES(?,?,?,?,?,?)`,
+		n.ID, n.Name, n.PanelURL, n.CertPath, n.KeyPath, n.PairedAt.UTC().Format(time.RFC3339))
+	return err
+}
+
+func (d *DB) GetNode() (Node, error) {
+	var n Node
+	var pairedAt string
+	err := d.sql.QueryRow(`SELECT id,name,panel_url,cert_path,key_path,paired_at FROM nodes LIMIT 1`).
+		Scan(&n.ID, &n.Name, &n.PanelURL, &n.CertPath, &n.KeyPath, &pairedAt)
+	if err != nil {
+		return Node{}, err
+	}
+	n.PairedAt, err = time.Parse(time.RFC3339, pairedAt)
+	if err != nil {
+		return Node{}, fmt.Errorf("parse paired_at: %w", err)
+	}
+	return n, nil
 }
 
 func (d *DB) SetResourceLimits(l ResourceLimits) error {
