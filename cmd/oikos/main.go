@@ -34,8 +34,12 @@ func run(args []string) error {
 		return runInstall(args[1:])
 	case "daemon":
 		return runDaemon(args[1:])
+	case "doctor":
+		return runDoctor(args[1:])
 	case "diagnose":
 		return runDiagnose(args[1:])
+	case "update":
+		return runUpdate(args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}

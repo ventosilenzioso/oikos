@@ -143,6 +143,12 @@ Alur `Apply`:
    monitoring.
 9. Container Docker tidak direstart karena independen dari proses daemon.
 
+`--health-check-only` validates Docker daemon connectivity with the Docker
+client `Ping` API. It does not fabricate a container ID or call runtime
+container metrics. The plugin manifest backup source is configured as
+`plugins.manifest_path`; when present, the file is copied into the same
+timestamped backup directory as config and SQLite.
+
 Jika proses baru gagal readiness setelah switch, `Rollback` mengembalikan
 symlink `current` ke slot previous. Backup database/config tetap tersedia dan
 tidak dihapus otomatis.

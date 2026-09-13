@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	nodepb "github.com/oikos/oikos/gen/go/node"
@@ -23,11 +24,20 @@ type DaemonArgs struct {
 	Tunnel        tunnel.Manager
 	Observability *api.ObservabilityService
 	Filesystem    *api.FilesystemService
+	Handoff       func()
+}
+
+func (a DaemonArgs) TriggerHandoff() {
+	if a.Handoff != nil {
+		a.Handoff()
+	}
 }
 
 // Run menjalankan loop daemon: serve API lokal, dial Panel, heartbeat +
 // command stream, reconnect dengan backoff. Kembali hanya saat ctx selesai.
 func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error {
+	var handoff sync.Once
+	triggerHandoff := func() { handoff.Do(args.TriggerHandoff) }
 	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", args.LocalPort))
 	if err != nil {
 		return fmt.Errorf("listen api lokal: %w", err)
@@ -47,12 +57,14 @@ func Run(ctx context.Context, args DaemonArgs, lc *orchestrator.Lifecycle) error
 	for {
 		if err := runOnce(ctx, args, lc, since); err != nil {
 			if ctx.Err() != nil {
+				triggerHandoff()
 				return ctx.Err()
 			}
 		}
 		attempt++
 		select {
 		case <-ctx.Done():
+			triggerHandoff()
 			return ctx.Err()
 		case <-time.After(ComputeBackoff(attempt)):
 		}

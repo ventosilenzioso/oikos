@@ -1,3 +1,5 @@
+//go:build linux
+
 package resource
 
 import (
@@ -7,13 +9,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// Limits adalah batas resource; 0 berarti unlimited (tidak ditulis).
-type Limits struct {
-	CPUMillicores int64
-	MemoryBytes   int64
-	PIDMax        int64
-}
 
 // ApplyLimits menulis file limit cgroup v2 ke direktori cgroup yang sudah ada.
 func ApplyLimits(dir string, lim Limits) error {

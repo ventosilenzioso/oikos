@@ -17,7 +17,19 @@ type EventBus struct {
 }
 
 func (b *EventBus) SubscribeWithCancel(typ string) (<-chan Event, func()) {
+	ch, _, cancel := b.subscribeWithDone(typ)
+	return ch, cancel
+}
+
+// SubscribeWithCancelDone is like SubscribeWithCancel and also exposes a
+// signal for consumers that need to stop their receive loop on cancellation.
+func (b *EventBus) SubscribeWithCancelDone(typ string) (<-chan Event, <-chan struct{}, func()) {
+	return b.subscribeWithDone(typ)
+}
+
+func (b *EventBus) subscribeWithDone(typ string) (<-chan Event, <-chan struct{}, func()) {
 	ch := make(chan Event, 64)
+	done := make(chan struct{})
 	b.mu.Lock()
 	b.subs[typ] = append(b.subs[typ], ch)
 	b.mu.Unlock()
@@ -32,9 +44,10 @@ func (b *EventBus) SubscribeWithCancel(typ string) (<-chan Event, func()) {
 					break
 				}
 			}
+			close(done)
 		})
 	}
-	return ch, cancel
+	return ch, done, cancel
 }
 
 func NewEventBus() *EventBus {

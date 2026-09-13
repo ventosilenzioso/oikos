@@ -119,3 +119,40 @@ func TestDaemonEndToEnd(t *testing.T) {
 		t.Fatal("Run tidak berhenti setelah cancel")
 	}
 }
+
+func TestRunInvokesHandoffOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	called := make(chan struct{}, 1)
+	rt := &handoffRuntime{Runtime: runtime.NewFake()}
+	lc := orchestrator.New(nil, rt, orchestrator.NewEventBus())
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, DaemonArgs{LocalPort: freePort(t), Handoff: func() { called <- struct{}{} }}, lc)
+	}()
+	cancel()
+	select {
+	case <-called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("handoff was not invoked during cancellation")
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after cancellation")
+	}
+	if rt.stopCalls != 0 || rt.restartCalls != 0 || rt.deleteCalls != 0 {
+		t.Fatalf("runtime lifecycle calls = stop:%d restart:%d delete:%d", rt.stopCalls, rt.restartCalls, rt.deleteCalls)
+	}
+}
+
+type handoffRuntime struct {
+	runtime.Runtime
+	stopCalls, restartCalls, deleteCalls int
+}
+
+func (r *handoffRuntime) Stop(context.Context, string, int) error { r.stopCalls++; return nil }
+func (r *handoffRuntime) Restart(context.Context, string) error   { r.restartCalls++; return nil }
+func (r *handoffRuntime) Delete(context.Context, string, bool) error {
+	r.deleteCalls++
+	return nil
+}
