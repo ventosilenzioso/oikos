@@ -5,15 +5,20 @@ package runtime
 import "context"
 
 type ContainerSpec struct {
-	ServerID    string
-	Image       string
-	Command     []string
-	Env         map[string]string
-	CPULimit    int64 // milicores
-	MemoryLimit int64 // bytes
-	PIDLimit    int64
-	WorkingDir  string
-	MountSource string // path folder data server di host
+	ServerID          string
+	Image             string
+	Command           []string
+	Env               map[string]string
+	CPULimit          int64 // milicores
+	MemoryLimit       int64 // bytes
+	PIDLimit          int64
+	WorkingDir        string
+	MountSource       string // path folder data server di host
+	SeccompProfile    string
+	AppArmorProfile   string
+	SELinuxLabel      string
+	UserNamespace     bool
+	PermissiveSandbox bool
 }
 
 type ContainerStatus string
