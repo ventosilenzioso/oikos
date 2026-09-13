@@ -159,6 +159,38 @@ func TestHostCleanPluginExitIsUnhealthyAndHostRemainsUsable(t *testing.T) {
 	}
 }
 
+func TestHostAutomaticallyCleansUpAfterUnexpectedExitAndCanRestart(t *testing.T) {
+	root := t.TempDir()
+	manifest := fakeManifest(t, root, "", "exit")
+	host, err := NewHost(manifest, HostOptions{SocketRoot: root, OikosVersion: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := host.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := host.HealthCheck(); err == nil {
+		t.Fatal("health check succeeded while plugin exited")
+	}
+	if !waitUntil(time.Second, func() bool { return !host.Status().Running }) {
+		t.Fatal("plugin did not exit")
+	}
+	if _, err := os.Stat(host.socketPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("socket remains after unexpected exit: %v", err)
+	}
+
+	t.Setenv("OIKOS_FAKE_PLUGIN_MODE", "")
+	if err := host.Start(); err != nil {
+		t.Fatalf("restart after unexpected exit: %v", err)
+	}
+	if err := host.HealthCheck(); err != nil {
+		t.Fatal(err)
+	}
+	if err := host.Stop(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestHostCanStartAndStopAfterFailedHandshake(t *testing.T) {
 	root := t.TempDir()
 	bad := fakeManifest(t, root, "", "undeclared")

@@ -248,15 +248,40 @@ func (h *Host) markUnhealthy(err error) {
 }
 
 func (h *Host) waitProcess(cmd *exec.Cmd, waitDone chan struct{}) {
-	if err := cmd.Wait(); err != nil {
-		h.markUnhealthy(err)
-	} else {
-		h.markUnhealthy(errors.New("plugin exited"))
+	err := cmd.Wait()
+	if err == nil {
+		err = errors.New("plugin exited")
 	}
+	h.cleanupAfterExit(cmd, err)
 	close(waitDone)
 	h.mu.Lock()
-	h.status.Running = false
+	if h.cmd == cmd {
+		h.status.Running = false
+	}
 	h.mu.Unlock()
+}
+
+func (h *Host) cleanupAfterExit(cmd *exec.Cmd, err error) {
+	h.mu.Lock()
+	if h.cmd != cmd {
+		h.mu.Unlock()
+		return
+	} else {
+		h.status.Healthy = false
+		h.status.Error = err
+	}
+	conn, listener, socket := h.conn, h.listener, h.socketPath
+	h.client, h.conn, h.listener = nil, nil, nil
+	h.mu.Unlock()
+	if conn != nil {
+		_ = conn.Close()
+	}
+	if listener != nil {
+		_ = listener.Close()
+	}
+	if socket != "" {
+		_ = os.Remove(socket)
+	}
 }
 
 func verifyBinary(path, expected string) error {
