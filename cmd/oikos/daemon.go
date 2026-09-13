@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -62,13 +63,17 @@ func runDaemon(args []string) error {
 		}
 	}
 	bus := orchestrator.NewEventBus()
-	lc := orchestrator.New(db, rt, bus)
 	defer conn.Close()
 	tunnelClient := tunnelpb.NewTunnelServiceClient(conn)
 	manager, err := tunnel.NewFromConfig(cfg.Runtime, tunnel.NewPanelAllocator(tunnelClient, node.ID), db, func(typ, serverID string) { bus.Publish(orchestrator.Event{Type: typ, ServerID: serverID}) })
 	if err != nil {
 		return err
 	}
+	portRoot := os.Getenv("OIKOS_EGGS_DIR")
+	if portRoot == "" {
+		portRoot = "eggs"
+	}
+	lc := orchestrator.NewWithTunnel(db, rt, bus, manager, orchestrator.EggPortProvider{Root: portRoot})
 	return agent.Run(ctx, agent.DaemonArgs{
 		PanelAddr: cfg.Panel.Address,
 		CertPath:  node.CertPath,

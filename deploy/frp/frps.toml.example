@@ -1,0 +1,9 @@
+# Jalankan sebagai deployment terpisah dari Oikos node.
+bindAddr = "0.0.0.0"
+bindPort = 7000
+
+auth.method = "token"
+auth.token = "replace-with-secret"
+
+# Batasi sesuai range yang dialokasikan Panel.
+allowPorts = [{ start = 30000, end = 40000 }]
