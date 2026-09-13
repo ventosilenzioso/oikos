@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/oikos/oikos/internal/resource"
 	"github.com/oikos/oikos/internal/runtime"
 	"github.com/oikos/oikos/internal/store"
 )
@@ -51,18 +52,26 @@ func (l *Lifecycle) StartServer(ctx context.Context, id string) error {
 		return fmt.Errorf("ambil server: %w", err)
 	}
 	containerID := s.ContainerID
+	lim, limErr := l.db.GetResourceLimits(id)
+	hasLimits := limErr == nil && (lim.CPULimit > 0 || lim.MemoryLimitMB > 0 || lim.PIDLimit > 0)
 	if containerID == "" {
 		var env map[string]string
 		if err := json.Unmarshal([]byte(s.Environment), &env); err != nil {
 			return fmt.Errorf("decode env: %w", err)
 		}
-		containerID, err = l.rt.Create(ctx, runtime.ContainerSpec{
+		spec := runtime.ContainerSpec{
 			ServerID:    s.ID,
 			Image:       "oikos/" + s.EggID,
 			Command:     strings.Fields(s.StartupCommand),
 			Env:         env,
 			MountSource: "",
-		})
+		}
+		if hasLimits {
+			spec.CPULimit = lim.CPULimit
+			spec.MemoryLimit = lim.MemoryLimitMB * 1024 * 1024
+			spec.PIDLimit = lim.PIDLimit
+		}
+		containerID, err = l.rt.Create(ctx, spec)
 		if err != nil {
 			return fmt.Errorf("runtime create: %w", err)
 		}
@@ -75,6 +84,14 @@ func (l *Lifecycle) StartServer(ctx context.Context, id string) error {
 	}
 	if err := setStatus(l.db, id, "running"); err != nil {
 		return fmt.Errorf("update status: %w", err)
+	}
+	if hasLimits && resource.DetectCgroupVersion() == "v2" {
+		if cg, err := resource.FindContainerCgroup("/sys/fs/cgroup", containerID); err == nil {
+			rlim := resource.Limits{CPUMillicores: lim.CPULimit, MemoryBytes: lim.MemoryLimitMB * 1024 * 1024, PIDMax: lim.PIDLimit}
+			if err := resource.ApplyLimits(cg, rlim); err != nil {
+				return fmt.Errorf("terapkan limit: %w", err)
+			}
+		}
 	}
 	l.bus.Publish(Event{Type: "server.started", ServerID: id})
 	return nil
