@@ -116,5 +116,6 @@ func runDaemon(args []string) error {
 		Tunnel:        manager,
 		Observability: api.NewObservabilityService(health, metrics, db),
 		Filesystem:    fileService,
+		Handoff:       func() { _ = conn.Close() },
 	}, lc)
 }

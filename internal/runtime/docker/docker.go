@@ -33,6 +33,24 @@ func New(host string) (runtime.Runtime, error) {
 	return &dockerRuntime{cli: cli}, nil
 }
 
+func Ping(host string) error {
+	opts := []client.Opt{client.WithAPIVersionNegotiation()}
+	if host == "" {
+		opts = append(opts, client.FromEnv)
+	} else {
+		opts = append(opts, client.WithHost(host))
+	}
+	cli, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	_, err = cli.Ping(context.Background())
+	if err != nil {
+		return fmt.Errorf("docker ping: %w", err)
+	}
+	return nil
+}
+
 func envList(env map[string]string) []string {
 	out := make([]string, 0, len(env))
 	for k, v := range env {

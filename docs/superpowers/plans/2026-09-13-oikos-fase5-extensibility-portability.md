@@ -124,10 +124,11 @@ func TestPluginRegistryRoundtrip(t *testing.T) {
 
 **Files:** `cmd/oikos/update.go`, `update_test.go`; modify `cmd/oikos/main.go`, `internal/agent/daemon.go`.
 
-**Interfaces:** `runUpdate(args []string) error`; flags `--version`, `--url`, `--sha256`, `--signature`, `--versions-dir`, `--config`; `--health-check-only` returns 0 only after config/SQLite/Docker checks pass.
+**Interfaces:** `runUpdate(args []string) error`; flags `--version`, `--url`, `--sha256`, `--signature`, `--versions-dir`, `--config`; `--health-check-only` returns 0 only after config/SQLite/Docker client Ping checks pass. `config.plugins.manifest_path`, when set, is backed up with config and SQLite.
 
 - [ ] **Step 1:** Test update command with fake release and health runner; assert slot switch and config/database backup. Test failed health check keeps old symlink.
 - [ ] **Step 2:** Implement manual-only command, no auto-update goroutine, signal/drain hook, and candidate health-check subprocess. Handoff must not call runtime Stop/Restart/Delete.
+- [ ] **Review fixes:** Docker readiness uses client Ping rather than fabricated-container Stats; daemon wires cancellation handoff; candidate argv is tested exactly; config, SQLite, and plugin manifest backups are content-verified.
 - [ ] **Step 3:** Run `go test ./cmd/oikos/ ./internal/update/ -v`; expect PASS.
 - [ ] **Step 4:** Commit `git add cmd/oikos internal/agent && git commit -m "feat: oikos update graceful handoff"`.
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/hex"
@@ -21,8 +20,15 @@ import (
 )
 
 var (
-	updateVerifier     internalupdate.ReleaseVerifier = environmentReleaseVerifier{}
-	updateHealthRunner                                = defaultHealthRunner
+	updateVerifier      internalupdate.ReleaseVerifier = environmentReleaseVerifier{}
+	updateHealthRunner                                 = defaultHealthRunner
+	updateCommandRunner                                = func(name string, args ...string) error {
+		cmd := exec.Command(name, args...)
+		cmd.Stdout = io.Discard
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	updateDockerPing = docker.Ping
 )
 
 func runUpdate(args []string) error {
@@ -60,7 +66,15 @@ func runUpdate(args []string) error {
 		if err := copyFile(*configPath, filepath.Join(backupDir, "config.yaml")); err != nil {
 			return err
 		}
-		return copyFile(dbPath, filepath.Join(backupDir, "oikos.db"))
+		if err := copyFile(dbPath, filepath.Join(backupDir, "oikos.db")); err != nil {
+			return err
+		}
+		if cfg.Plugins.ManifestPath != "" {
+			if err := copyFile(cfg.Plugins.ManifestPath, filepath.Join(backupDir, filepath.Base(cfg.Plugins.ManifestPath))); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	health := internalupdate.HealthRunnerFunc(func(candidate string) error {
 		return updateHealthRunner(candidate, *configPath)
@@ -100,21 +114,14 @@ func runHealthCheck(configPath string) error {
 	if cfg.Runtime.Engine == "fake" {
 		return nil
 	}
-	rt, err := docker.New(cfg.Runtime.DockerSocket)
-	if err != nil {
-		return fmt.Errorf("docker: %w", err)
-	}
-	if _, err := rt.Stats(context.Background(), "__health_probe__"); err != nil {
+	if err := updateDockerPing(cfg.Runtime.DockerSocket); err != nil {
 		return fmt.Errorf("docker: %w", err)
 	}
 	return nil
 }
 
 func defaultHealthRunner(candidate, configPath string) error {
-	cmd := exec.Command(candidate, "--health-check-only", "--config", configPath)
-	cmd.Stdout = io.Discard
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return updateCommandRunner(candidate, "--health-check-only", "--config", configPath)
 }
 
 func copyFile(source, destination string) error {

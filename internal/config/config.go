@@ -78,6 +78,10 @@ type SFTPConfig struct {
 	HostKeyPath string `yaml:"host_key_path"`
 }
 
+type PluginsConfig struct {
+	ManifestPath string `yaml:"manifest_path"`
+}
+
 type Config struct {
 	Node          NodeConfig          `yaml:"node"`
 	Panel         PanelConfig         `yaml:"panel"`
@@ -87,6 +91,7 @@ type Config struct {
 	Observability ObservabilityConfig `yaml:"observability"`
 	Filesystem    FilesystemConfig    `yaml:"filesystem"`
 	SFTP          SFTPConfig          `yaml:"sftp"`
+	Plugins       PluginsConfig       `yaml:"plugins"`
 }
 
 func Load(path string) (*Config, error) {
