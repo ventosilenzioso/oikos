@@ -1,4 +1,4 @@
-module github.com/oikos/oikos
+module github.com/ventosilenzioso/oikos
 
 go 1.26.8
 
